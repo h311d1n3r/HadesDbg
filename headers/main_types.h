@@ -1,8 +1,15 @@
-//
-// Created by h311d1n3r on 28/11/2021.
-//
-
 #ifndef HADESDBG_MAIN_TYPES_H
 #define HADESDBG_MAIN_TYPES_H
 
-#endif //HADESDBG_MAIN_TYPES_H
+#include <string>
+#include <vector>
+
+using namespace std;
+
+struct BinaryParams {
+    string binaryPath;
+    vector<string> binaryArgs;
+    unsigned long long int entryAddress;
+};
+
+#endif
