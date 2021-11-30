@@ -20,8 +20,10 @@ private:
     void convertArgs(vector<string> args, char** execArgs);
     bool readBinaryHeader();
     void fixEntryBreakpoint();
+    vector<unsigned char> injectPipeModeAssemblyVec;
+    vector<unsigned char> preparePipeModeAssemblyInjection();
 public:
-    HadesDbg(BinaryParams params) : params(params){};
+    HadesDbg(BinaryParams params) : params(params){this->injectPipeModeAssemblyVec = this->preparePipeModeAssemblyInjection();};
     void run();
     void handleExit();
 };

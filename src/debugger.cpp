@@ -1,5 +1,4 @@
 #include <debugger.h>
-#include <sstream>
 #include <log.h>
 #include <iomanip>
 #include <string.h>
@@ -12,21 +11,14 @@
 
 using namespace std;
 
-/*
-mov rsi, 0x1000
-mov rdx, 0x7
-mov r10, 0x1
-mov r8, 0x66
-mov r9, 0x0
-syscall
-int3
- */
-unsigned char mallocAssembly[] = {
-        0x48,0xc7,0xc6,0x00,0x10,0x00,0x00,0x48,0xc7,
-        0xc2,0x07,0x00,0x00,0x00,0x49,0xc7,0xc2,0x01,
-        0x00,0x00,0x00,0x49,0xc7,0xc0,0x66,0x00,0x00,
-        0x00,0x49,0xc7,0xc1,0x00,0x00,0x00,0x00,0x0f,
-        0x05,0xcc
+unsigned char pipeModeAssembly[] = {
+    //prints 'aaa' from the son
+    0x48,0xc7,0xc0,0x01,0x00,0x00,0x00,0x48,0xc7,
+    0xc7,0x01,0x00,0x00,0x00,0x68,0x61,0x61,0x61,
+    0x00,0x48,0x89,0xe6,0x48,0xc7,0xc2,0x03,0x00,
+    0x00,0x00,0x0f,0x05,
+
+    0xc3
 };
 
 bool HadesDbg::readBinaryHeader() {
@@ -42,11 +34,11 @@ bool HadesDbg::readBinaryHeader() {
                 if(idField[4] == 2) {
                     if(idField[5] == 1) {
                         if(idField[7] == 0 || idField[7] == 3) {
-                            this->replacedFileEntry = (unsigned char*) malloc(sizeof(mallocAssembly));
+                            this->replacedFileEntry = (unsigned char*) malloc(this->injectPipeModeAssemblyVec.size());
                             this->fileEntry = *((unsigned long long int*)(idField + 0x18));
                             if(this->fileEntry >= 0x400000) this->fileEntry -= 0x400000;
                             binaryRead.seekg(this->fileEntry, binaryRead.beg);
-                            binaryRead.read((char*)this->replacedFileEntry, sizeof(mallocAssembly));
+                            binaryRead.read((char*)this->replacedFileEntry, this->injectPipeModeAssemblyVec.size());
                             binaryRead.close();
                             ofstream binaryWrite;
                             binaryWrite.open(this->params.binaryPath, ofstream::binary | ofstream::out | ofstream::in);
@@ -98,6 +90,45 @@ void HadesDbg::handleExit() {
     if(!this->fixedEntryBreakpoint) this->fixEntryBreakpoint();
 }
 
+vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection() {
+    /*
+    mov rax, 0x9
+    mov rdi, 0x0
+    mov rsi, 0x0
+    mov rdx, 0x7
+    mov r10, 0x22
+    mov r8, -0x1
+    mov r9, 0x0
+    syscall
+    */
+    unsigned char allocArr[] = {
+            0x48,0xc7,0xc0,0x09,0x00,0x00,0x00,0x48,0xc7,
+            0xc7,0x00,0x00,0x00,0x00,0x48,0xc7,0xc6,0x00,
+            0x00,0x00,0x00,0x48,0xc7,0xc2,0x07,0x00,0x00,
+            0x00,0x49,0xc7,0xc2,0x22,0x00,0x00,0x00,0x49,
+            0xc7,0xc0,0xff,0xff,0xff,0xff,0x49,0xc7,0xc1,
+            0x00,0x00,0x00,0x00,0x0f,0x05
+    };
+    vector<unsigned char> vec;
+    vec.insert(vec.end(), allocArr, allocArr + sizeof(allocArr));
+    vec.push_back(0x50);
+    unsigned char movArr[] = {0x48,0xc7,0x00};
+    unsigned char addArr[] = {0x48,0x83,0xc0,0x04};
+    for(int i = 0; i < sizeof(pipeModeAssembly); i+=4) {
+        vec.insert(vec.end(), movArr, movArr + sizeof(movArr));
+        for(int i2 = i; i2 < i + 4; i2++) {
+            if(i2 < sizeof(pipeModeAssembly)) vec.push_back(pipeModeAssembly[i2]);
+            else vec.push_back(0x0);
+        }
+        if(i + 4 < sizeof(pipeModeAssembly)) {
+            vec.insert(vec.end(), addArr, addArr + sizeof(addArr));
+        }
+    }
+    vec.push_back(0x58);
+    vec.push_back(0xcc);
+    return vec;
+}
+
 void HadesDbg::run() {
     if(!this->readBinaryHeader()) return;
     this->pid = fork();
@@ -115,31 +146,39 @@ void HadesDbg::run() {
     sprintf(file, "/proc/%ld/mem", (long)this->pid);
     this->memoryFd = open(file, O_RDWR);
     if(this->memoryFd != -1) {
-        mallocAssembly[0x18] = (unsigned char) this->memoryFd;
+        unsigned char* injectPipeModeAssembly = &(this->injectPipeModeAssemblyVec)[0];
+        unsigned int injectPipeModeAssemblySize = this->injectPipeModeAssemblyVec.size();
+        unsigned int pipeModeAssemblySize = sizeof(pipeModeAssembly);
+        memcpy(injectPipeModeAssembly+0x11,&pipeModeAssemblySize,sizeof(pipeModeAssemblySize));
         user_regs_struct regs;
         Logger::getLogger().log(LogLevel::SUCCESS, "Target reached entry breakpoint !");
-        Logger::getLogger().log(LogLevel::INFO, "Allocating pipe mode area...");
+        Logger::getLogger().log(LogLevel::INFO, "Injecting pipe mode in child process...");
         ptrace(PTRACE_GETREGS,this->pid,NULL,&regs);
         regs.rip--;
         user_regs_struct savedRegs = regs;
         this->effectiveEntry = regs.rip;
-        pwrite(this->memoryFd, &mallocAssembly, sizeof(mallocAssembly), this->effectiveEntry);
+        pwrite(this->memoryFd, injectPipeModeAssembly, injectPipeModeAssemblySize, this->effectiveEntry);
         ptrace(PTRACE_SETREGS,this->pid,NULL,&regs);
         ptrace(PTRACE_CONT, pid, NULL, NULL);
         waitpid(this->pid, NULL, 0);
         ptrace(PTRACE_GETREGS,this->pid,NULL,&regs);
-        unsigned long long mallocStart = regs.rdi;
-        if(mallocStart) Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
+        unsigned long long allocStart = regs.rax;
+        if(allocStart) Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
         else {
             Logger::getLogger().log(LogLevel::FATAL, "Failure...");
             close(this->memoryFd);
             this->handleExit();
         }
-        pwrite(this->memoryFd, this->replacedFileEntry, sizeof(mallocAssembly), this->effectiveEntry);
+        pwrite(this->memoryFd, this->replacedFileEntry, injectPipeModeAssemblySize, this->effectiveEntry);
         ptrace(PTRACE_SETREGS,this->pid,NULL,&savedRegs);
-        Logger::getLogger().log(LogLevel::INFO, "Injecting pipe mode in child process...");
-        //write assembly in mapped region
         //inject pipe breakpoint at entry point
+        //below fails because replaced instructions must be executed
+        unsigned char breakpointCall[] = {
+            0x50,0x48,0xb8,0x00,0x00,0x00,0x00,
+            0x00,0x00,0x00,0x00,0xff,0xd0,0x58
+        };
+        memcpy(breakpointCall + 0x3, &allocStart, sizeof(allocStart));
+        pwrite(this->memoryFd, &breakpointCall, sizeof(breakpointCall), savedRegs.rip);
         if(!ptrace(PTRACE_DETACH,this->pid,NULL,NULL)) {
             Logger::getLogger().log(LogLevel::SUCCESS, "Successfully detached from child process !");
             Logger::getLogger().log(LogLevel::INFO, "Entering pipe mode.");
