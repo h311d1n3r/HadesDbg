@@ -36,6 +36,7 @@ void printHelpMessage() {
     Logger::getLogger().log(LogLevel::INFO, "Parameters:", false, true, false);
     stringstream paramsList;
     paramsList << "\033[1;33m   entry\033[0;36m -> Specifies the program entry point. e.g: 'entry 0x401000'" << endl;
+    paramsList << "\033[1;33m   bp\033[0;36m -> Specifies a program breakpoint and the length of instructions to be replaced. e.g: 'bp 0x401000:20'" << endl;
     paramsList << "\033[1;33m   args\033[0;36m -> Specifies the arguments to be passed to the traced binary. e.g: 'args \"./name.bin hello world\"'" << endl;
     Logger::getLogger().log(LogLevel::INFO, paramsList.str(), false, true, false);
     Logger::getLogger().log(LogLevel::INFO, "Flags:", false, true, false);
@@ -66,6 +67,43 @@ bool analyseParam(string param, string val) {
                 Logger::getLogger().log(LogLevel::FATAL, msg.str());
                 return false;
             }
+        } else if(!paramName.compare("bp")) {
+            int delimiterIndex = val.find(":");
+            if(delimiterIndex == string::npos) {
+                stringstream msg;
+                msg << "Breakpoints need to follow this format -> \033[;37maddress:length\033[;31m !";
+                Logger::getLogger().log(LogLevel::FATAL, msg.str());
+                return false;
+            }
+            string addrPart = val.substr(0, delimiterIndex);
+            string lenPart = val.substr(delimiterIndex + 1);
+            unsigned long long int addr = 0, lenBuf = 0;
+            unsigned char len = 0;
+            if(!inputToNumber(addrPart, addr)) {
+                stringstream msg;
+                msg << "Specified breakpoint address \033[;37m" << addrPart << "\033[;31m is not a number !";
+                Logger::getLogger().log(LogLevel::FATAL, msg.str());
+                return false;
+            }
+            if(!inputToNumber(lenPart, lenBuf)) {
+                stringstream msg;
+                msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is not a number !";
+                Logger::getLogger().log(LogLevel::FATAL, msg.str());
+                return false;
+            }
+            if(lenBuf > 64) {
+                stringstream msg;
+                msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is greater than 64 !";
+                Logger::getLogger().log(LogLevel::FATAL, msg.str());
+                return false;
+            } else if(lenBuf < 12) {
+                stringstream msg;
+                msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is smaller than 12 !";
+                Logger::getLogger().log(LogLevel::FATAL, msg.str());
+                return false;
+            }
+            len = lenBuf;
+            params.breakpoints[addr] = len;
         } else if(!paramName.compare("args")) {
             vector<string> args;
             split(val, ' ', args);

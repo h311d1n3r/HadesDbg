@@ -12,13 +12,10 @@
 using namespace std;
 
 unsigned char pipeModeAssembly[] = {
-    //stores old rip in rax
-    0x59,0x50,0x48,0x83,0xc4,0x08,0x58,
+    //restore rax
+    0x58, 0x58,
 
-    //TODO: write rax (old rip) in file
-
-    //restores rax
-    0x48,0x83,0xec,0x10,0x58,
+    //TODO: write rip in file
 
     //push registers
     0x50,0x53,0x51,0x52,0x57,0x56,0x41,0x50,0x41,
@@ -36,12 +33,20 @@ unsigned char pipeModeAssembly[] = {
     0x41,0x5b,0x41,0x5a,0x41,0x59,0x41,0x58,0x5e,
     0x5f,0x5a,0x59,0x5b,0x58,
 
-    //ret (restores rip)
-    0xc3,
-
     //replaced instructions
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00
+    0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,
+    0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,
+    0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,
+    0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,
+    0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,
+    0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,
+    0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,
+    0x90,
+
+    //return
+    0x48,0x83,0xec,0x08,0x50,0x48,0x83,0xc4,0x10,
+    0x48,0xb8,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x50,0x48,0x83,0xec,0x08,0x58,0xc3
 };
 
 bool HadesDbg::readBinaryHeader() {
@@ -170,8 +175,8 @@ void HadesDbg::run() {
     this->memoryFd = open(file, O_RDWR);
     if(this->memoryFd != -1) {
         unsigned char breakpointCall[] = {
-            0x50,0x51,0x48,0xb9,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0xff,0xe1
+            0x50,0x48,0xb8,0x00,0x00,0x00,0x00,
+            0x00,0x00,0x00,0x00,0xff,0xd0
         };
         user_regs_struct regs;
         Logger::getLogger().log(LogLevel::SUCCESS, "Target reached entry breakpoint !");
@@ -181,8 +186,11 @@ void HadesDbg::run() {
         user_regs_struct savedRegs = regs;
         this->effectiveEntry = regs.rip;
         unsigned int pipeModeAssemblySize = sizeof(pipeModeAssembly);
-        pread(this->memoryFd, pipeModeAssembly + pipeModeAssemblySize - sizeof(breakpointCall), sizeof(breakpointCall), this->effectiveEntry);
-        pipeModeAssembly[pipeModeAssemblySize - sizeof(breakpointCall)] = this->replacedFileEntry[0];
+        const unsigned int tempSize = 14;
+        pread(this->memoryFd, pipeModeAssembly + pipeModeAssemblySize - 64 - 26, tempSize, this->effectiveEntry);
+        pipeModeAssembly[pipeModeAssemblySize - 64 - 26] = this->replacedFileEntry[0];
+        unsigned long long int returnAddr = this->effectiveEntry + tempSize;
+        memcpy(pipeModeAssembly + pipeModeAssemblySize - 0xf, &returnAddr, sizeof(returnAddr));
         this->injectPipeModeAssemblyVec = this->preparePipeModeAssemblyInjection();
         unsigned char* injectPipeModeAssembly = &(this->injectPipeModeAssemblyVec)[0];
         unsigned int injectPipeModeAssemblySize = this->injectPipeModeAssemblyVec.size();
@@ -203,7 +211,10 @@ void HadesDbg::run() {
         ptrace(PTRACE_SETREGS,this->pid,NULL,&savedRegs);
         //inject pipe breakpoint at entry point
         //below fails because replaced instructions must be executed
-        memcpy(breakpointCall + 0x4, &allocStart, sizeof(allocStart));
+        memcpy(breakpointCall + 0x3, &allocStart, sizeof(allocStart));
+        stringstream test;
+        test << hex << +allocStart;
+        Logger::getLogger().log(LogLevel::FATAL, test.str());
         pwrite(this->memoryFd, &breakpointCall, sizeof(breakpointCall), this->effectiveEntry);
         if(!ptrace(PTRACE_DETACH,this->pid,NULL,NULL)) {
             Logger::getLogger().log(LogLevel::SUCCESS, "Successfully detached from child process !");
