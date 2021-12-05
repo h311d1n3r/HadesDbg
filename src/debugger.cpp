@@ -185,37 +185,48 @@ void HadesDbg::run() {
         regs.rip--;
         user_regs_struct savedRegs = regs;
         this->effectiveEntry = regs.rip;
-        unsigned int pipeModeAssemblySize = sizeof(pipeModeAssembly);
-        const unsigned int tempSize = 14;
-        pread(this->memoryFd, pipeModeAssembly + pipeModeAssemblySize - 64 - 26, tempSize, this->effectiveEntry);
-        pipeModeAssembly[pipeModeAssemblySize - 64 - 26] = this->replacedFileEntry[0];
-        unsigned long long int returnAddr = this->effectiveEntry + tempSize;
-        memcpy(pipeModeAssembly + pipeModeAssemblySize - 0xf, &returnAddr, sizeof(returnAddr));
-        this->injectPipeModeAssemblyVec = this->preparePipeModeAssemblyInjection();
-        unsigned char* injectPipeModeAssembly = &(this->injectPipeModeAssemblyVec)[0];
+        pwrite(this->memoryFd, this->replacedFileEntry, 1, this->effectiveEntry);
         unsigned int injectPipeModeAssemblySize = this->injectPipeModeAssemblyVec.size();
-        memcpy(injectPipeModeAssembly+0x11,&pipeModeAssemblySize,sizeof(pipeModeAssemblySize));
-        pwrite(this->memoryFd, injectPipeModeAssembly, injectPipeModeAssemblySize, this->effectiveEntry);
-        ptrace(PTRACE_SETREGS,this->pid,NULL,&regs);
-        ptrace(PTRACE_CONT, pid, NULL, NULL);
-        waitpid(this->pid, NULL, 0);
-        ptrace(PTRACE_GETREGS,this->pid,NULL,&regs);
-        unsigned long long allocStart = regs.rax;
-        if(allocStart) Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
-        else {
-            Logger::getLogger().log(LogLevel::FATAL, "Failure...");
-            close(this->memoryFd);
-            this->handleExit();
+        map<unsigned long long int, unsigned long long int> allocAddrFromBpAddr;
+        unsigned int pipeModeAssemblySize = sizeof(pipeModeAssembly);
+        map<unsigned long long int, unsigned char>::iterator breakpoint;
+        for(breakpoint = this->params.breakpoints.begin(); breakpoint != this->params.breakpoints.end(); breakpoint++) {
+            unsigned long long int breakpointAddr = breakpoint->first - this->params.entryAddress + this->effectiveEntry;
+            unsigned char breakpointLength = breakpoint->second;
+            pread(this->memoryFd, pipeModeAssembly + pipeModeAssemblySize - 64 - 26, breakpointLength, breakpointAddr);
+            unsigned long long int returnAddr = breakpointAddr + breakpointLength;
+            memcpy(pipeModeAssembly + pipeModeAssemblySize - 0xf, &returnAddr, sizeof(returnAddr));
+            this->injectPipeModeAssemblyVec = this->preparePipeModeAssemblyInjection();
+            unsigned char *injectPipeModeAssembly = &(this->injectPipeModeAssemblyVec)[0];
+            memcpy(injectPipeModeAssembly + 0x11, &pipeModeAssemblySize, sizeof(pipeModeAssemblySize));
+            pwrite(this->memoryFd, injectPipeModeAssembly, injectPipeModeAssemblySize, this->effectiveEntry);
+            memset(pipeModeAssembly + pipeModeAssemblySize - 64 - 26, 0x90, 64);
+            ptrace(PTRACE_SETREGS, this->pid, NULL, &savedRegs);
+            ptrace(PTRACE_CONT, pid, NULL, NULL);
+            waitpid(this->pid, NULL, 0);
+            ptrace(PTRACE_GETREGS,this->pid,NULL,&regs);
+            unsigned long long allocStart = regs.rax;
+            if(!allocStart) {
+                Logger::getLogger().log(LogLevel::FATAL, "Failure...");
+                close(this->memoryFd);
+                this->handleExit();
+            }
+            allocAddrFromBpAddr[breakpointAddr] = allocStart;
         }
+        Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
+        ptrace(PTRACE_SETREGS, this->pid, NULL, &savedRegs);
         pwrite(this->memoryFd, this->replacedFileEntry, injectPipeModeAssemblySize, this->effectiveEntry);
-        ptrace(PTRACE_SETREGS,this->pid,NULL,&savedRegs);
-        //inject pipe breakpoint at entry point
-        //below fails because replaced instructions must be executed
-        memcpy(breakpointCall + 0x3, &allocStart, sizeof(allocStart));
-        stringstream test;
-        test << hex << +allocStart;
-        Logger::getLogger().log(LogLevel::FATAL, test.str());
-        pwrite(this->memoryFd, &breakpointCall, sizeof(breakpointCall), this->effectiveEntry);
+        map<unsigned long long int, unsigned long long int>::iterator injectData;
+        stringstream injectBpMsg;
+        injectBpMsg << "Injecting \033[;37m" << allocAddrFromBpAddr.size() << "\033[;36m breakpoint(s)...";
+        Logger::getLogger().log(LogLevel::INFO, injectBpMsg.str());
+        for(injectData = allocAddrFromBpAddr.begin(); injectData != allocAddrFromBpAddr.end(); injectData++) {
+            unsigned long long int breakpointAddr = injectData->first;
+            unsigned long long int allocStart = injectData->second;
+            memcpy(breakpointCall + 0x3, &allocStart, sizeof(allocStart));
+            pwrite(this->memoryFd, &breakpointCall, sizeof(breakpointCall), breakpointAddr);
+        }
+        Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
         if(!ptrace(PTRACE_DETACH,this->pid,NULL,NULL)) {
             Logger::getLogger().log(LogLevel::SUCCESS, "Successfully detached from child process !");
             Logger::getLogger().log(LogLevel::INFO, "Entering pipe mode.");
