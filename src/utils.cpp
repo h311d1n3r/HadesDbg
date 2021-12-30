@@ -1,5 +1,6 @@
 #include <utils.h>
 #include <regex>
+#include <log.h>
 
 void split(const string &str, char c, vector<string> &elements) {
     stringstream strStream(str);
@@ -36,4 +37,32 @@ string toUppercase(string input) {
     string upperCase = input;
     for (char& c: upperCase) c = toupper(c);
     return upperCase;
+}
+
+bool endsWith(std::string const &value, std::string const &ending) {
+    if(ending.size() > value.size()) return false;
+    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
+}
+
+string executeCommand(const char* cmd) {
+    array<char, 128> buffer;
+    string result;
+    unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+    if (!pipe) {
+        Logger::getLogger().log(LogLevel::ERROR, "Unable to execute command !");
+    }
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+        result += buffer.data();
+    }
+    return result;
+}
+
+unsigned long long int invertEndian(unsigned long long int val) {
+    unsigned long long int ret = 0;
+    char* valArr = (char*)&val;
+    char* retArr = (char*)&ret;
+    for(int i = 0; i < sizeof(val); i++) {
+        retArr[i] = valArr[sizeof(val)-1-i];
+    }
+    return ret;
 }
