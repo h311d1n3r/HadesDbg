@@ -278,7 +278,7 @@ void HadesDbg::handleExit() {
         }
     }
     stringstream lsofCommand;
-    lsofCommand << "lsof " << this->params.binaryPath;
+    lsofCommand << "lsof \"" << this->params.binaryPath << "\"";
     string lsofResult = executeCommand(lsofCommand.str().c_str());
     vector<string> lsofResLines;
     split(lsofResult, '\n', lsofResLines);

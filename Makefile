@@ -10,8 +10,10 @@ COMPILE_FLAGS=-std=c++17
 HADESDBG:	clean compile
 
 compile:
-	mkdir -p $(HADESDBG_OUT)
-	$(CC) $(COMPILE_FLAGS) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -o$(HADESDBG_OUT)/$(HADESDBG_NAME)
+	@echo "Compiling..."
+	@mkdir -p $(HADESDBG_OUT)
+	@$(CC) $(COMPILE_FLAGS) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -o$(HADESDBG_OUT)/$(HADESDBG_NAME)
 			  
 clean:
-	rm -rf $(HADESDBG_OUT)
+	@echo "Cleaning output directory..."
+	@rm -rf $(HADESDBG_OUT)
