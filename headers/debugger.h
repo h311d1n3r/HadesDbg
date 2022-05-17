@@ -22,6 +22,7 @@ private:
     bool readBinaryHeader();
     void fixEntryBreakpoint();
     vector<unsigned char> injectPipeModeAssemblyVec;
+    vector<unsigned char> pipeModeAssemblyVec;
     vector<unsigned char> preparePipeModeAssemblyInjection();
     vector<unsigned char> preparePipeModeAssembly();
     string prepareAction(pid_t pid, char* bytes, unsigned int bytesLen);
@@ -40,7 +41,10 @@ public:
         WRITE_REG = 0x5,
         WRITE_MEM = 0x6,
     };
-    HadesDbg(BinaryParams params) : params(params){this->preparePipeModeAssembly(); this->injectPipeModeAssemblyVec = this->preparePipeModeAssemblyInjection();};
+    HadesDbg(BinaryParams params) : params(params){
+        this->pipeModeAssemblyVec = this->preparePipeModeAssembly();
+        this->injectPipeModeAssemblyVec = this->preparePipeModeAssemblyInjection();
+    };
     void run();
     void handleExit();
 };
