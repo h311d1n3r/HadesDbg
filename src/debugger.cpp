@@ -11,9 +11,11 @@
 #include <sys/ptrace.h>
 #include <fcntl.h>
 #include <iostream>
+#include <asmjit/asmjit.h>
 
 using Code = HadesDbg::DbgCode;
 using namespace std;
+using namespace asmjit::x86;
 
 unsigned char pipeModeAssembly[] = {
     //restore rax
@@ -24,7 +26,7 @@ unsigned char pipeModeAssembly[] = {
     0x41,0x51,0x41,0x52,0x41,0x53,0x41,0x54,0x41,
     0x55,0x41,0x56,0x41,0x57,0x55,
 
-    //push rip
+    //push rax
     0x48,0xb8,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x50,
 
@@ -407,6 +409,343 @@ void HadesDbg::endBp(pid_t pid) {
     while(filesystem::exists(filePath)) {
         this_thread::sleep_for(chrono::milliseconds(500));
     }
+}
+
+vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
+    asmjit::JitRuntime rt;
+    asmjit::CodeHolder code;
+    code.init(rt.environment());
+    Assembler a(&code);
+
+    //restore rax
+    a.pop(rax);
+    a.pop(rax);
+
+    //push registers
+    a.push(rsp);
+    a.push(rax);
+    a.push(rbx);
+    a.push(rcx);
+    a.push(rdx);
+    a.push(rdi);
+    a.push(rsi);
+    a.push(r8);
+    a.push(r9);
+    a.push(r10);
+    a.push(r11);
+    a.push(r12);
+    a.push(r13);
+    a.push(r14);
+    a.push(r15);
+    a.push(rbp);
+
+    //push rax
+    a.movabs(rax, 0);
+    a.push(rax);
+
+    //allocate space for pipe file name (./pipe_XXXXXXXX.hades0).
+    //start of allocated region is moved to rbx
+    a.mov(rax, 9);
+    a.mov(rdi, 0);
+    a.mov(rsi, 0x16);
+    a.mov(rdx, 7);
+    a.mov(r10, 0x22);
+    a.mov(r8, -1);
+    a.mov(r9, 0);
+    a.syscall();
+    a.mov(rbx, rax);
+
+    //get pid
+    a.mov(rax, 0x27);
+    a.syscall();
+
+    //write pipe file name in allocated region
+    //start of allocated region is moved to rdi
+    a.mov(rdi, rbx);
+    a.mov(qword_ptr(rbx), 0x69702f2e);
+    a.add(rbx, 4);
+    a.mov(byte_ptr(rbx), 0x70);
+    a.inc(rbx);
+    a.mov(byte_ptr(rbx), 0x65);
+    a.inc(rbx);
+    a.mov(byte_ptr(rbx), 0x5f);
+    a.mov(rdx, rbx);
+    a.add(rbx, 8);
+    asmjit::Label nameLoopLabel = a.newLabel();
+    a.bind(nameLoopLabel);
+    a.mov(rcx, rax);
+    a.and_(rcx, 0xf);
+    a.cmp(rcx, 9);
+    asmjit::Label letterLabel = a.newLabel();
+    asmjit::Label afterLetterLabel = a.newLabel();
+    a.ja(letterLabel);
+    a.add(rcx, 0x30);
+    a.jmp(afterLetterLabel);
+    a.bind(letterLabel);
+    a.add(rcx, 0x57);
+    a.bind(afterLetterLabel);
+    a.mov(byte_ptr(rbx), cl);
+    a.dec(rbx);
+    a.shr(rax, 4);
+    a.cmp(rbx, rdx);
+    a.jne(nameLoopLabel);
+    a.add(rbx, 9);
+    a.mov(qword_ptr(rbx), 0x6461682e);
+    a.add(rbx, 4);
+    a.mov(byte_ptr(rbx), 0x65);
+    a.inc(rbx);
+    a.mov(byte_ptr(rbx), 0x73);
+    a.inc(rbx);
+    a.mov(byte_ptr(rbx), 0);
+
+    //open pipe file in create mode
+    //start of allocated region is pushed on the stack
+    //file descriptor is in rax
+    a.mov(rax, 2);
+    a.mov(rsi, 0x42);
+    a.mov(rdx, 0x1ff);
+    a.syscall();
+    a.push(rdi);
+
+    //allocate region for read and write operations
+    //file descriptor is moved to rbx
+    //start of allocation is in rax
+    a.mov(rbx, rax);
+    a.mov(rax, 9);
+    a.mov(rdi, 0);
+    a.mov(rsi, 0xff);
+    a.mov(rdx, 7);
+    a.mov(r10, 0x22);
+    a.mov(r8, -1);
+    a.mov(r9, 0);
+    a.syscall();
+
+    //write target ready message to file
+    //start of allocation is moved to rsi
+    a.mov(rsi, rax);
+    a.mov(byte_ptr(rax), Code::TARGET_READY);
+    a.mov(rdi, rbx);
+    a.mov(rax, 1);
+    a.mov(rdx, 1);
+    a.syscall();
+
+    //close file
+    a.mov(rax, 3);
+    a.syscall();
+
+    //wait for 1 second
+    //start of allocation is put in r8
+    asmjit::Label timeLabel = a.newLabel();
+    a.bind(timeLabel);
+    a.mov(rdx, rsi);
+    a.mov(qword_ptr(rdx), 1);
+    a.add(rdx, 4);
+    a.mov(qword_ptr(rdx), 0);
+    a.add(rdx, 4);
+    a.mov(qword_ptr(rdx), 0);
+    a.add(rdx, 4);
+    a.mov(qword_ptr(rdx), 0);
+    a.mov(rdi, rsi);
+    a.mov(r8, rdi);
+    a.mov(rsi, 8);
+    a.mov(rax, 0x23);
+    a.syscall();
+
+    //open pipe file again
+    //if it fails, jump back to wait
+    a.pop(rdi);
+    a.push(rdi);
+    a.mov(rax, 2);
+    a.mov(rsi, 2);
+    a.mov(rdx, 0x1ff);
+    a.syscall();
+    a.mov(rsi, r8);
+    a.cmp(rax, 0);
+    a.js(timeLabel);
+
+    //read in allocated region
+    //if target ready message, jump back
+    //file descriptor is in rbx
+    a.mov(rdi, rax);
+    a.mov(rsi, r8);
+    a.mov(rdx, 0xff);
+    a.mov(rax, 0);
+    a.syscall();
+    a.cmp(byte_ptr(r8), Code::TARGET_READY);
+    a.je(timeLabel);
+    a.mov(rbx, rdi);
+
+    //read register
+    a.cmp(byte_ptr(r8), Code::READ_REG);
+    asmjit::Label readMemLabel = a.newLabel();
+    a.jne(readMemLabel);
+    a.add(rsp, 8);
+    a.inc(r8);
+    a.add(rsp, qword_ptr(r8));
+    a.pop(r9);
+    a.sub(rsp, qword_ptr(r8));
+    a.dec(r8);
+    a.sub(rsp, 0x10);
+    a.mov(byte_ptr(r8), Code::TARGET_READY);
+    a.inc(r8);
+    a.mov(qword_ptr(r8), r9);
+    a.add(r8, 8);
+    a.mov(byte_ptr(r8), 0);
+    a.sub(r8, 9);
+    a.mov(rdi, rbx);
+    a.mov(rsi, 0);
+    a.mov(rdx, 0);
+    a.mov(rax, 8);
+    a.syscall();
+    a.mov(rsi, r8);
+    a.mov(rdx, 0xa);
+    a.mov(rax, 1);
+    a.syscall();
+
+    //read memory value
+    a.bind(readMemLabel);
+    a.cmp(byte_ptr(r8), Code::READ_MEM);
+    asmjit::Label writeRegLabel = a.newLabel();
+    a.jne(writeRegLabel);
+    a.inc(r8);
+    a.mov(r9, qword_ptr(r8));
+    a.mov(r9, qword_ptr(r9));
+    a.dec(r8);
+    a.mov(byte_ptr(r8), Code::TARGET_READY);
+    a.inc(r8);
+    a.mov(qword_ptr(r8), r9);
+    a.add(r8, 8);
+    a.mov(byte_ptr(r8), 0);
+    a.sub(r8, 9);
+    a.mov(rdi, rbx);
+    a.mov(rsi, 0);
+    a.mov(rdx, 0);
+    a.mov(rax, 8);
+    a.syscall();
+    a.mov(rsi, r8);
+    a.mov(rdx, 0xa);
+    a.mov(rax, 1);
+    a.syscall();
+
+    //write register
+    a.bind(writeRegLabel);
+    a.cmp(byte_ptr(r8), Code::WRITE_REG);
+    asmjit::Label writeMemLabel = a.newLabel();
+    a.jne(writeMemLabel);
+    a.add(rsp, 0x10);
+    a.inc(r8);
+    a.add(rsp, qword_ptr(r8));
+    a.add(r8, 8);
+    a.push(qword_ptr(r8));
+    a.sub(r8, 8);
+    a.sub(rsp, 8);
+    a.sub(rsp, qword_ptr(r8));
+    a.dec(r8);
+    a.mov(byte_ptr(r8), Code::TARGET_READY);
+    a.inc(r8);
+    a.mov(byte_ptr(r8), 0);
+    a.dec(r8);
+    a.mov(rdi, rbx);
+    a.mov(rsi, 0);
+    a.mov(rdx, 0);
+    a.mov(rax, 8);
+    a.syscall();
+    a.mov(rsi, r8);
+    a.mov(rdx, 2);
+    a.mov(rax, 1);
+    a.syscall();
+
+    //write memory
+    a.bind(writeMemLabel);
+    a.cmp(byte_ptr(r8), Code::WRITE_MEM);
+    asmjit::Label closePipeLabel = a.newLabel();
+    a.jne(closePipeLabel);
+    a.inc(r8);
+    a.mov(r9, qword_ptr(r8));
+    a.add(r8, 8);
+    a.mov(r10, qword_ptr(r8));
+    a.sub(r8, 9);
+    a.mov(qword_ptr(r9), r10);
+    a.mov(byte_ptr(r8), Code::TARGET_READY);
+    a.inc(r8);
+    a.mov(byte_ptr(r8), 0);
+    a.dec(r8);
+    a.mov(rdi, rbx);
+    a.mov(rsi, 0);
+    a.mov(rdx, 0);
+    a.mov(rax, 8);
+    a.syscall();
+    a.mov(rsi, r8);
+    a.mov(rdx, 2);
+    a.mov(rax, 1);
+    a.syscall();
+
+    //close pipe file
+    a.bind(closePipeLabel);
+    a.mov(rax, 3);
+    a.mov(rdi, rbx);
+    a.syscall();
+
+    //check end_breakpoint
+    a.cmp(byte_ptr(r8), Code::END_BREAKPOINT);
+    a.jne(timeLabel);
+
+    //delete pipe file
+    //pipe file name is in rdi
+    a.pop(rdi);
+    a.mov(rax, 0x57);
+    a.syscall();
+
+    //free read/write region
+    a.mov(rax, 0xb);
+    a.mov(rdi, r8);
+    a.mov(rsi, 0xff);
+    a.syscall();
+
+    //free pipe file name region
+    a.mov(rax, 0xb);
+    a.mov(rsi, 0x16);
+    a.syscall();
+
+    //prevent pop of rip
+    a.add(rsp, 8);
+
+    //pop registers
+    a.pop(rbp);
+    a.pop(r15);
+    a.pop(r14);
+    a.pop(r13);
+    a.pop(r12);
+    a.pop(r11);
+    a.pop(r10);
+    a.pop(r9);
+    a.pop(r8);
+    a.pop(rsi);
+    a.pop(rdi);
+    a.pop(rdx);
+    a.pop(rcx);
+    a.pop(rbx);
+    a.pop(rax);
+
+    //prevent pop of rsp
+    a.add(rsp, 8);
+
+    //replaced instructions
+    for(unsigned char i = 0; i < 64; i++) a.nop();
+
+    //return
+    a.sub(rsp, 8);
+    a.push(rax);
+    a.add(rsp, 0x10);
+    a.movabs(rax, 0);
+    a.push(rax);
+    a.sub(rsp, 8);
+    a.pop(rax);
+    a.ret();
+
+    vector<unsigned char> vec(a.bufferData(), a.bufferPtr());
+    for(unsigned char c : vec) cout << "\\x" << hex << setw(2) << setfill('0') << +c;
+    return vec;
 }
 
 vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection() {

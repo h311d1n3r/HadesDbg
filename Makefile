@@ -3,23 +3,41 @@ HADESDBG_NAME=hadesdbg
 HADESDBG_SRC=./src
 HADESDBG_INC=./headers
 HADESDBG_OUT=./bin
+HADESDBG_OUT_LIB=./bin/lib
 
-ASMJIT_SRC=./lib/asmjit/src/asmjit/**
-ASMJIT_INC=./lib/asmjit/src/asmjit
+ASMJIT_INC=./lib/asmjit/src
+ASMJIT_OUT=./lib/asmjit/bin
 
-LIB_SRC=$(ASMJIT_SRC)
 LIB_INC=$(ASMJIT_INC)
 
 CC=g++
 COMPILE_FLAGS=-std=c++17 -lrt
+QUIET_MODE=> /dev/null
 
-HADESDBG:	clean compile
+HADESDBG: clean compile
 
-compile:
-	@echo "Compiling..."
+bin/lib:
+	@echo "Compiling libraries..."
+	@mkdir -p $(HADESDBG_OUT_LIB)
+	@echo "Compiling asmjit..."
+	@mkdir -p $(ASMJIT_OUT)
+	@cd $(ASMJIT_OUT) && cmake .. $(QUIET_MODE) && make $(QUIET_MODE)
+	@mv $(ASMJIT_OUT)/libasmjit.so $(HADESDBG_OUT_LIB)
+	@rm -rf $(ASMJIT_OUT)
+	@echo "Libraries successfully compiled !"
+
+compile: bin/lib
+	@echo "Compiling project..."
+ifneq ($(shell id -u), 0)
+	@echo "You need root priviledges in order to compile the project !"
+else
 	@mkdir -p $(HADESDBG_OUT)
-	@$(CC) $(HADESDBG_SRC)/*.cpp $(LIB_SRC)/*.cpp -I$(HADESDBG_INC) -I$(LIB_INC) -o$(HADESDBG_OUT)/$(HADESDBG_NAME) $(COMPILE_FLAGS)
+	@cp $(HADESDBG_OUT_LIB)/* /usr/local/lib
+	@$(CC) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(LIB_INC) -o$(HADESDBG_OUT)/$(HADESDBG_NAME) $(COMPILE_FLAGS) -lasmjit
+	@chmod 777 $(HADESDBG_OUT)/$(HADESDBG_NAME)
+	@echo "Project successfully compiled !"
+endif
 			  
 clean:
 	@echo "Cleaning output directory..."
-	@rm -rf $(HADESDBG_OUT)
+	@rm -f $(HADESDBG_OUT)/$(HADESDBG_NAME)
