@@ -1,7 +1,7 @@
 #include <debugger.h>
 #include <log.h>
 #include <iomanip>
-#include <string.h>
+#include <cstring>
 #include <thread>
 #include <chrono>
 #include <sys/wait.h>
@@ -18,11 +18,11 @@ using namespace std;
 using namespace asmjit::x86;
 
 bool HadesDbg::readBinaryHeader() {
-    ifstream binaryRead(this->params.binaryPath, ifstream::binary);
+    ifstream binaryRead(this->params.binaryPath, fstream::binary);
     if(binaryRead) {
-        binaryRead.seekg(0, binaryRead.end);
-        int len = binaryRead.tellg();
-        binaryRead.seekg(0, binaryRead.beg);
+        binaryRead.seekg(0, fstream::end);
+        long len = binaryRead.tellg();
+        binaryRead.seekg(0, fstream::beg);
         if(len >= 0x20) {
             char* idField = (char*) malloc(0x20);
             binaryRead.read(idField, 0x20);
@@ -31,15 +31,15 @@ bool HadesDbg::readBinaryHeader() {
                     if(idField[5] == 1) {
                         if(idField[7] == 0 || idField[7] == 3) {
                             this->replacedFileEntry = (unsigned char*) malloc(this->injectPipeModeAssemblyVec.size());
-                            this->fileEntry = *((unsigned long long int*)(idField + 0x18));
+                            this->fileEntry = *((BigInt*)(idField + 0x18));
                             if(this->fileEntry >= 0x400000) this->fileEntry -= 0x400000;
-                            binaryRead.seekg(this->fileEntry, binaryRead.beg);
-                            binaryRead.read((char*)this->replacedFileEntry, this->injectPipeModeAssemblyVec.size());
+                            binaryRead.seekg((long)this->fileEntry, fstream::beg);
+                            binaryRead.read((char*)this->replacedFileEntry, (long)this->injectPipeModeAssemblyVec.size());
                             binaryRead.close();
                             ofstream binaryWrite;
-                            binaryWrite.open(this->params.binaryPath, ofstream::binary | ofstream::out | ofstream::in);
-                            binaryWrite.seekp(this->fileEntry, binaryWrite.beg);
-                            const char breakpoint = 0xCC;
+                            binaryWrite.open(this->params.binaryPath, fstream::binary | fstream::out | fstream::in);
+                            binaryWrite.seekp((long)this->fileEntry, fstream::beg);
+                            const char breakpoint = (const char) 0xCC;
                             binaryWrite.write(&breakpoint, 1);
                             stringstream msg;
                             msg << "Replaced byte 0x" << hex << setfill('0') << setw(2) << +this->replacedFileEntry[0] << " at address 0x" << hex << setfill('0') << setw(8) << +this->fileEntry << " (entry point) with byte 0xcc (breakpoint).";
@@ -60,42 +60,28 @@ bool HadesDbg::readBinaryHeader() {
     return false;
 }
 
-void HadesDbg::convertArgs(vector<string> args, char** execArgs) {
+void HadesDbg::convertArgs(const vector<string>& args, char** execArgs) {
     int argsAmount = 0;
-    for (int i = 0; i < args.size(); i++) {
-        execArgs[argsAmount++] = strdup(args[i].c_str());
+    for (const string& arg : args) {
+        execArgs[argsAmount++] = strdup(arg.c_str());
     }
-    execArgs[argsAmount++] = NULL;
+    execArgs[argsAmount++] = nullptr;
 }
 
 void HadesDbg::fixEntryBreakpoint() {
     this->fixedEntryBreakpoint = true;
     ofstream binaryWrite;
     do {
-        binaryWrite.open(this->params.binaryPath, ofstream::binary | ofstream::out | ofstream::in);
+        binaryWrite.open(this->params.binaryPath, fstream::binary | fstream::out | fstream::in);
         this_thread::sleep_for(std::chrono::milliseconds(10));
     } while(!binaryWrite.is_open());
-    binaryWrite.seekp(this->fileEntry, binaryWrite.beg);
+    binaryWrite.seekp((long)this->fileEntry, fstream::beg);
     binaryWrite.write((char*)this->replacedFileEntry, 1);
     binaryWrite.close();
     Logger::getLogger().log(LogLevel::INFO, "Restored breakpoint byte.");
 }
 
 void HadesDbg::handleExit() {
-    for(const filesystem::directory_entry &entry : filesystem::directory_iterator("./")) {
-        const string path = entry.path().u8string();
-        if (endsWith(toUppercase(path), ".HADES")) {
-            unsigned long long int pid = 0;
-            if (!inputToNumber("0x" + path.substr(path.length() - 14, 8), pid)) {
-                Logger::getLogger().log(LogLevel::ERROR, "Unable to read breakpoint PID !");
-            }
-            stringstream killStr;
-            killStr << "Killing son with PID: \033[;37m"  << hex << +pid << "\033[;36m";
-            Logger::getLogger().log(LogLevel::INFO, killStr.str());
-            remove(path.c_str());
-            kill(pid, SIGKILL);
-        }
-    }
     stringstream lsofCommand;
     lsofCommand << "lsof \"" << this->params.binaryPath << "\"";
     string lsofResult = executeCommand(lsofCommand.str().c_str());
@@ -108,14 +94,31 @@ void HadesDbg::handleExit() {
             split(line, ' ', lineFields);
             if(lineFields.size() >= 2) {
                 string pidStr = lineFields[1];
-                unsigned long long int pid = 0;
-                if(inputToNumber(pidStr, pid)) {
+                BigInt sonPid = 0;
+                if(inputToNumber(pidStr, sonPid)) {
                     stringstream killStr;
-                    killStr << "Killing son with PID: \033[;37m"  << hex << +pid << "\033[;36m";
+                    killStr << "Killing son with PID: \033[;37m" << hex << +sonPid << "\033[;36m";
                     Logger::getLogger().log(LogLevel::INFO, killStr.str());
-                    kill(pid, SIGKILL);
+                    kill((pid_t)sonPid, SIGKILL);
                 }
             }
+        }
+    }
+    for(const filesystem::directory_entry &entry : filesystem::directory_iterator("./")) {
+        const string path = entry.path().u8string();
+        if (endsWith(toUppercase(path), ".HADES")) {
+            BigInt sonPid = 0;
+            if (!inputToNumber("0x" + path.substr(path.length() - 14, 8), sonPid)) {
+                Logger::getLogger().log(LogLevel::ERROR, "Unable to read breakpoint PID !");
+            }
+            //Check if process with pid exists
+            if(!kill((int)sonPid, 0)) {
+                stringstream killStr;
+                killStr << "Killing son with PID: \033[;37m" << hex << +sonPid << "\033[;36m";
+                Logger::getLogger().log(LogLevel::INFO, killStr.str());
+                kill((int)sonPid, SIGKILL);
+            }
+            remove(path.c_str());
         }
     }
     kill(this->pid, SIGKILL);
@@ -133,12 +136,12 @@ string HadesDbg::prepareAction(pid_t pid, char* bytes, unsigned int bytesLen) {
     return filePath.str();
 }
 
-unsigned long long int HadesDbg::readReg(pid_t pid, Register reg) {
+BigInt HadesDbg::readReg(pid_t sonPid, Register reg) {
     const char readRegBytes[] = {
         Code::READ_REG,
         (char)(0x80 - reg), 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
     };
-    string filePath = this->prepareAction(pid, (char*)readRegBytes, sizeof(readRegBytes));
+    string filePath = this->prepareAction(sonPid, (char*)readRegBytes, sizeof(readRegBytes));
     char* buffer = (char*) malloc(0xa);
     while(true) {
         ifstream fileReader;
@@ -148,20 +151,20 @@ unsigned long long int HadesDbg::readReg(pid_t pid, Register reg) {
         if(buffer[0] == Code::TARGET_READY) break;
         this_thread::sleep_for(chrono::milliseconds(500));
     }
-    unsigned long long int ret = 0;
+    BigInt ret = 0;
     memcpy(&ret, buffer+0x1, sizeof(ret));
     free(buffer);
     if(reg == Register::RIP) ret = ret - this->effectiveEntry + this->params.entryAddress;
     return ret;
 }
 
-unsigned long long int HadesDbg::readMem(pid_t pid, unsigned long long int addr) {
+BigInt HadesDbg::readMem(pid_t sonPid, BigInt addr) {
     char readMemBytes[] = {
         Code::READ_MEM,
         0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
     };
     memcpy(readMemBytes + 1, &addr, sizeof(addr));
-    string filePath = this->prepareAction(pid, (char*)readMemBytes, sizeof(readMemBytes));
+    string filePath = this->prepareAction(sonPid, (char*)readMemBytes, sizeof(readMemBytes));
     char* buffer = (char*) malloc(0xa);
     while(true) {
         ifstream fileReader;
@@ -171,20 +174,20 @@ unsigned long long int HadesDbg::readMem(pid_t pid, unsigned long long int addr)
         if(buffer[0] == Code::TARGET_READY) break;
         this_thread::sleep_for(chrono::milliseconds(500));
     }
-    unsigned long long int ret = 0;
+    BigInt ret = 0;
     memcpy(&ret, buffer+0x1, sizeof(ret));
     free(buffer);
     return ret;
 }
 
-void HadesDbg::writeReg(pid_t pid, Register reg, unsigned long long int val) {
+void HadesDbg::writeReg(pid_t sonPid, Register reg, BigInt val) {
     char writeRegBytes[] = {
         Code::WRITE_REG,
         (char)(0x80 - reg), 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
         0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
     };
     memcpy(writeRegBytes + 9, &val, sizeof(val));
-    string filePath = this->prepareAction(pid, (char*)writeRegBytes, sizeof(writeRegBytes));
+    string filePath = this->prepareAction(sonPid, (char*)writeRegBytes, sizeof(writeRegBytes));
     char* buffer = (char*) malloc(0x1);
     while(true) {
         ifstream fileReader;
@@ -197,7 +200,7 @@ void HadesDbg::writeReg(pid_t pid, Register reg, unsigned long long int val) {
     free(buffer);
 }
 
-void HadesDbg::writeMem(pid_t pid, unsigned long long int addr, unsigned long long int val) {
+void HadesDbg::writeMem(pid_t sonPid, BigInt addr, BigInt val) {
     char writeMemBytes[] = {
             Code::WRITE_MEM,
             0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
@@ -205,7 +208,7 @@ void HadesDbg::writeMem(pid_t pid, unsigned long long int addr, unsigned long lo
     };
     memcpy(writeMemBytes + 1, &addr, sizeof(addr));
     memcpy(writeMemBytes + 9, &val, sizeof(val));
-    string filePath = this->prepareAction(pid, (char*)writeMemBytes, sizeof(writeMemBytes));
+    string filePath = this->prepareAction(sonPid, (char*)writeMemBytes, sizeof(writeMemBytes));
     char* buffer = (char*) malloc(0x1);
     while(true) {
         ifstream fileReader;
@@ -218,11 +221,11 @@ void HadesDbg::writeMem(pid_t pid, unsigned long long int addr, unsigned long lo
     free(buffer);
 }
 
-void HadesDbg::endBp(pid_t pid) {
+void HadesDbg::endBp(pid_t sonPid) {
     const char endBpBytes[] = {
         Code::END_BREAKPOINT
     };
-    string filePath = this->prepareAction(pid, (char*)endBpBytes, sizeof(endBpBytes));
+    string filePath = this->prepareAction(sonPid, (char*)endBpBytes, sizeof(endBpBytes));
     while(filesystem::exists(filePath)) {
         this_thread::sleep_for(chrono::milliseconds(500));
     }
@@ -564,7 +567,7 @@ vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
     return vec;
 }
 
-vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection() {
+vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection(vector<unsigned char> pipeModeAssemblyVec) {
     /*
     mov rax, 0x9
     mov rdi, 0x0
@@ -588,13 +591,13 @@ vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection() {
     vec.push_back(0x50);
     unsigned char movArr[] = {0x48,0xc7,0x00};
     unsigned char addArr[] = {0x48,0x83,0xc0,0x04};
-    for(int i = 0; i < this->pipeModeAssemblyVec.size(); i+=4) {
+    for(int i = 0; i < pipeModeAssemblyVec.size(); i+=4) {
         vec.insert(vec.end(), movArr, movArr + sizeof(movArr));
         for(int i2 = i; i2 < i + 4; i2++) {
-            if(i2 < this->pipeModeAssemblyVec.size()) vec.push_back(this->pipeModeAssemblyVec[i2]);
+            if(i2 < pipeModeAssemblyVec.size()) vec.push_back(pipeModeAssemblyVec[i2]);
             else vec.push_back(0x0);
         }
-        if(i + 4 < this->pipeModeAssemblyVec.size()) {
+        if(i + 4 < pipeModeAssemblyVec.size()) {
             vec.insert(vec.end(), addArr, addArr + sizeof(addArr));
         }
     }
@@ -603,60 +606,60 @@ vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection() {
     return vec;
 }
 
-bool HadesDbg::listenInput(pid_t pid) {
+bool HadesDbg::listenInput(pid_t sonPid) {
     string input;
     while(true) {
         getline(cin, input);
-        vector<string> params;
-        split(input, ' ', params);
-        if(params.size() > 0) {
-            if(!params[0].compare("exit") || !params[0].compare("e")) return true;
-            else if(!params[0].compare("run") || !params[0].compare("r")) {
+        vector<string> cmdParams;
+        split(input, ' ', cmdParams);
+        if(!cmdParams.empty()) {
+            if(cmdParams[0] == "exit" || cmdParams[0] == "e") return true;
+            else if(cmdParams[0] == "run" || cmdParams[0] == "r") {
                 stringstream runAskStr;
-                runAskStr << "Asking \033[;37m" << hex << pid << "\033[;36m to resume execution...";
+                runAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m to resume execution...";
                 Logger::getLogger().log(LogLevel::INFO, runAskStr.str());
-                this->endBp(pid);
+                this->endBp(sonPid);
                 Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
                 return false;
             }
-            else if(!params[0].compare("readreg") || !params[0].compare("rr")) {
-                if(params.size() > 1) {
-                    string regName = toUppercase(params[1]);
+            else if(cmdParams[0] == "readreg" || cmdParams[0] == "rr") {
+                if(cmdParams.size() > 1) {
+                    string regName = toUppercase(cmdParams[1]);
                     if (registerFromName.count(regName)) {
                         stringstream regAskStr;
-                        regAskStr << "Asking \033[;37m" << hex << pid << "\033[;36m for \033[;37m" << regName << " \033[;36mvalue...";
+                        regAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m for \033[;37m" << regName << " \033[;36mvalue...";
                         Register reg = registerFromName[regName];
                         Logger::getLogger().log(LogLevel::INFO, regAskStr.str());
-                        unsigned long long int regValue = readReg(pid, reg);
+                        BigInt regValue = readReg(sonPid, reg);
                         stringstream regValStr;
                         regValStr << regName << ": \033[;37m" << hex << regValue << "\033[;32m";
                         Logger::getLogger().log(LogLevel::SUCCESS, regValStr.str());
                     } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid register ! \033[;37mreadreg register\033[;33m");
                 } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mreadreg register\033[;33m");
             }
-            else if(!params[0].compare("readmem") || !params[0].compare("rm")) {
-                if(params.size() > 2) {
-                    string addrStr = params[1];
+            else if(cmdParams[0] == "readmem" || cmdParams[0] == "rm") {
+                if(cmdParams.size() > 2) {
+                    string addrStr = cmdParams[1];
                     bool entryRelative = false;
-                    if(!addrStr.find("@")) {
+                    if(!addrStr.find('@')) {
                         entryRelative = true;
                         addrStr = addrStr.substr(1);
                     }
-                    unsigned long long int addr = 0;
+                    BigInt addr = 0;
                     if(inputToNumber(addrStr, addr)) {
-                        string lenStr = params[2];
-                        unsigned long long int len = 0;
+                        string lenStr = cmdParams[2];
+                        BigInt len = 0;
                         if(inputToNumber(lenStr, len)) {
                             if(len > 0) {
                                 stringstream memAskStr;
-                                memAskStr << "Asking \033[;37m" << hex << pid << "\033[;36m for \033[;37m" << hex << len
+                                memAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m for \033[;37m" << hex << len
                                           << " \033[;36mbytes at address \033[;37m" << hex << addr << "\033[;36m...";
                                 Logger::getLogger().log(LogLevel::INFO, memAskStr.str());
                                 stringstream memValStr;
                                 memValStr << hex << addr << ":";
                                 Logger::getLogger().log(LogLevel::SUCCESS, memValStr.str());
                                 for(int i = 0; i < len; i+=8) {
-                                    unsigned long long int memValue = readMem(pid, entryRelative ? (addr + i - this->params.entryAddress + this->effectiveEntry) : addr + i);
+                                    BigInt memValue = readMem(sonPid, entryRelative ? (addr + i - this->params.entryAddress + this->effectiveEntry) : addr + i);
                                     for(int i2 = 0; i2 < sizeof(memValue) && i+i2 < len; i2++) {
                                         cout << hex << setfill('0') << setw(2) << +(memValue >> (i2 * 8) & 0xff);
                                         if(i2+1 < sizeof(memValue) && i+i2+1 < len) cout << " ";
@@ -669,50 +672,50 @@ bool HadesDbg::listenInput(pid_t pid) {
                     } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid address ! \033[;37mreadmem address length\033[;33m");
                 } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mreadmem address length\033[;33m");
             }
-            else if(!params[0].compare("writereg") || !params[0].compare("wr")) {
-                if(params.size() > 2) {
-                    string regName = toUppercase(params[1]);
+            else if(cmdParams[0] == "writereg" || cmdParams[0] == "wr") {
+                if(cmdParams.size() > 2) {
+                    string regName = toUppercase(cmdParams[1]);
                     if (registerFromName.count(regName)) {
                         Register reg = registerFromName[regName];
-                        string valStr = params[2];
-                        unsigned long long int val;
+                        string valStr = cmdParams[2];
+                        BigInt val;
                         if(inputToNumber(valStr, val)) {
                             stringstream regEditStr;
-                            regEditStr << "Asking \033[;37m" << hex << pid << "\033[;36m to set \033[;37m" << regName
+                            regEditStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m to set \033[;37m" << regName
                                        << "\033[;36m to \033[;37m" << hex << val << "\033[;36m...";
                             Logger::getLogger().log(LogLevel::INFO, regEditStr.str());
-                            this->writeReg(pid, reg, val);
+                            this->writeReg(sonPid, reg, val);
                             Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
                         } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a number ! \033[;37mwritereg register value\033[;33m");
                     } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid register ! \033[;37mwritereg register value\033[;33m");
                 } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mwritereg register value\033[;33m");
             }
-            else if(!params[0].compare("writemem") || !params[0].compare("wm")) {
-                if(params.size() > 2) {
-                    string addrStr = params[1];
+            else if(cmdParams[0] == "writemem" || cmdParams[0] == "wm") {
+                if(cmdParams.size() > 2) {
+                    string addrStr = cmdParams[1];
                     bool entryRelative = false;
-                    if(!addrStr.find("@")) {
+                    if(!addrStr.find('@')) {
                         entryRelative = true;
                         addrStr = addrStr.substr(1);
                     }
-                    unsigned long long int addr;
+                    BigInt addr;
                     if(inputToNumber(addrStr, addr)) {
-                        string hexChain = params[2];
+                        string hexChain = cmdParams[2];
                         stringstream memEditStr;
-                        memEditStr << "Asking \033[;37m" << hex << pid << "\033[;36m to write \033[;37m" << hexChain
+                        memEditStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m to write \033[;37m" << hexChain
                                    << "\033[;36m at \033[;37m" << hex << addr << "\033[;36m...";
                         Logger::getLogger().log(LogLevel::INFO, memEditStr.str());
-                        for(int i = 0; i < hexChain.length(); i += 2 * sizeof(unsigned long long int)) {
-                            unsigned long long int val = 0;
-                            int substrLen = i + 2 * sizeof(unsigned long long int) > hexChain.length() ? hexChain.length() - i : 2 * sizeof(unsigned long long int);
+                        for(int i = 0; i < hexChain.length(); i += 2 * sizeof(BigInt)) {
+                            BigInt val = 0;
+                            unsigned long substrLen = i + 2 * sizeof(BigInt) > hexChain.length() ? hexChain.length() - i : 2 * sizeof(BigInt);
                             if(inputToNumber("0x"+hexChain.substr(i, substrLen), val)) {
                                 val = invertEndian(val);
-                                if(substrLen < 2 * sizeof(unsigned long long int)) {
-                                    unsigned long long int oldVal = readMem(pid, entryRelative ? (addr + (i/2) - this->params.entryAddress + this->effectiveEntry) : addr + (i/2));
-                                    val >>= sizeof(unsigned long long int) * 8 - (substrLen * 8 / 2);
+                                if(substrLen < 2 * sizeof(BigInt)) {
+                                    BigInt oldVal = readMem(sonPid, entryRelative ? (addr + (i / 2) - this->params.entryAddress + this->effectiveEntry) : addr + (i / 2));
+                                    val >>= sizeof(BigInt) * 8 - (substrLen * 8 / 2);
                                     val += (oldVal >> (substrLen * 8 / 2)) << (substrLen * 8 / 2);
                                 }
-                                this->writeMem(pid, entryRelative ? (addr + (i/2) - this->params.entryAddress + this->effectiveEntry) : addr + (i/2), val);
+                                this->writeMem(sonPid, entryRelative ? (addr + (i / 2) - this->params.entryAddress + this->effectiveEntry) : addr + (i / 2), val);
                             } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid hexadecimal chain ! \033[;37mwritemem address hex_chain\033[;33m");
                         }
                         Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
@@ -733,10 +736,10 @@ void HadesDbg::run() {
         convertArgs(params.binaryArgs, execArgs);
         execv(this->params.binaryPath.c_str(), execArgs);
     }
-    waitpid(this->pid, NULL, 0);
+    waitpid(this->pid, nullptr, 0);
     ptrace(PTRACE_CONT, pid, NULL, NULL);
     //breakpoint set in binary
-    waitpid(this->pid, NULL, 0);
+    waitpid(this->pid, nullptr, 0);
     char file[64];
     sprintf(file, "/proc/%ld/mem", (long)this->pid);
     this->memoryFd = open(file, O_RDWR);
@@ -745,33 +748,33 @@ void HadesDbg::run() {
             0x50,0x48,0xb8,0x00,0x00,0x00,0x00,
             0x00,0x00,0x00,0x00,0xff,0xd0
         };
-        user_regs_struct regs;
+        user_regs_struct regs = {};
         Logger::getLogger().log(LogLevel::SUCCESS, "Target reached entry breakpoint !");
         Logger::getLogger().log(LogLevel::INFO, "Injecting pipe mode in child process...");
         ptrace(PTRACE_GETREGS,this->pid,NULL,&regs);
         regs.rip--;
         user_regs_struct savedRegs = regs;
         this->effectiveEntry = regs.rip;
-        pwrite(this->memoryFd, this->replacedFileEntry, 1, this->effectiveEntry);
+        pwrite(this->memoryFd, this->replacedFileEntry, 1, (long)this->effectiveEntry);
         unsigned int injectPipeModeAssemblySize = this->injectPipeModeAssemblyVec.size();
-        map<unsigned long long int, unsigned long long int> allocAddrFromBpAddr;
+        map<BigInt, BigInt> allocAddrFromBpAddr;
         unsigned int pipeModeAssemblySize = this->pipeModeAssemblyVec.size();
-        map<unsigned long long int, unsigned char>::iterator breakpoint;
+        map<BigInt, unsigned char>::iterator breakpoint;
         for(breakpoint = this->params.breakpoints.begin(); breakpoint != this->params.breakpoints.end(); breakpoint++) {
-            unsigned long long int breakpointAddr = breakpoint->first - this->params.entryAddress + this->effectiveEntry;
+            BigInt breakpointAddr = breakpoint->first - this->params.entryAddress + this->effectiveEntry;
             unsigned char breakpointLength = breakpoint->second;
-            pread(this->memoryFd, &this->pipeModeAssemblyVec[0] + pipeModeAssemblySize - 64 - 26, breakpointLength, breakpointAddr);
+            pread(this->memoryFd, &this->pipeModeAssemblyVec[0] + pipeModeAssemblySize - 64 - 26, breakpointLength, (long)breakpointAddr);
             memcpy(&this->pipeModeAssemblyVec[0] + 0x1c, &breakpointAddr, sizeof(breakpointAddr));
-            unsigned long long int returnAddr = breakpointAddr + breakpointLength;
+            BigInt returnAddr = breakpointAddr + breakpointLength;
             memcpy(&this->pipeModeAssemblyVec[0] + pipeModeAssemblySize - 0xf, &returnAddr, sizeof(returnAddr));
-            this->injectPipeModeAssemblyVec = this->preparePipeModeAssemblyInjection();
+            this->injectPipeModeAssemblyVec = preparePipeModeAssemblyInjection(this->pipeModeAssemblyVec);
             unsigned char *injectPipeModeAssembly = &(this->injectPipeModeAssemblyVec)[0];
             memcpy(injectPipeModeAssembly + 0x11, &pipeModeAssemblySize, sizeof(pipeModeAssemblySize));
-            pwrite(this->memoryFd, injectPipeModeAssembly, injectPipeModeAssemblySize, this->effectiveEntry);
+            pwrite(this->memoryFd, injectPipeModeAssembly, injectPipeModeAssemblySize, (long)this->effectiveEntry);
             memset(&this->pipeModeAssemblyVec[0] + pipeModeAssemblySize - 64 - 26, 0x90, 64);
             ptrace(PTRACE_SETREGS, this->pid, NULL, &savedRegs);
             ptrace(PTRACE_CONT, pid, NULL, NULL);
-            waitpid(this->pid, NULL, 0);
+            waitpid(this->pid, nullptr, 0);
             ptrace(PTRACE_GETREGS,this->pid,NULL,&regs);
             unsigned long long allocStart = regs.rax;
             if(!allocStart) {
@@ -783,16 +786,16 @@ void HadesDbg::run() {
         }
         Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
         ptrace(PTRACE_SETREGS, this->pid, NULL, &savedRegs);
-        pwrite(this->memoryFd, this->replacedFileEntry, injectPipeModeAssemblySize, this->effectiveEntry);
-        map<unsigned long long int, unsigned long long int>::iterator injectData;
+        pwrite(this->memoryFd, this->replacedFileEntry, injectPipeModeAssemblySize, (long)this->effectiveEntry);
+        map<BigInt, BigInt>::iterator injectData;
         stringstream injectBpMsg;
         injectBpMsg << "Injecting \033[;37m" << allocAddrFromBpAddr.size() << "\033[;36m breakpoint(s)...";
         Logger::getLogger().log(LogLevel::INFO, injectBpMsg.str());
         for(injectData = allocAddrFromBpAddr.begin(); injectData != allocAddrFromBpAddr.end(); injectData++) {
-            unsigned long long int breakpointAddr = injectData->first;
-            unsigned long long int allocStart = injectData->second;
+            BigInt breakpointAddr = injectData->first;
+            BigInt allocStart = injectData->second;
             memcpy(breakpointCall + 0x3, &allocStart, sizeof(allocStart));
-            pwrite(this->memoryFd, &breakpointCall, sizeof(breakpointCall), breakpointAddr);
+            pwrite(this->memoryFd, &breakpointCall, sizeof(breakpointCall), (long)breakpointAddr);
         }
         Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
         if(!ptrace(PTRACE_DETACH,this->pid,NULL,NULL)) {
@@ -803,17 +806,17 @@ void HadesDbg::run() {
                 for(const filesystem::directory_entry &entry : filesystem::directory_iterator("./")) {
                     const string path = entry.path().u8string();
                     if(endsWith(toUppercase(path), ".HADES")) {
-                        unsigned long long int pid = 0;
-                        if(!inputToNumber("0x"+path.substr(path.length()-14, 8), pid)) {
+                        BigInt sonPid = 0;
+                        if(!inputToNumber("0x"+path.substr(path.length()-14, 8), sonPid)) {
                             Logger::getLogger().log(LogLevel::ERROR, "Unable to read breakpoint PID !");
                         }
-                        unsigned long long int rip = this->readReg(pid, Register::RIP);
+                        BigInt sonRip = this->readReg((int)sonPid, Register::RIP);
                         stringstream breakpointHit;
                         breakpointHit << "Breakpoint hit !" << endl;
-                        breakpointHit << "PID: \033[;37m"  << hex << +pid << "\033[;36m" << endl;
-                        breakpointHit << "Address: \033[;37m" << hex << +rip << "\033[;36m";
+                        breakpointHit << "PID: \033[;37m" << hex << +sonPid << "\033[;36m" << endl;
+                        breakpointHit << "Address: \033[;37m" << hex << +sonRip << "\033[;36m";
                         Logger::getLogger().log(LogLevel::INFO, breakpointHit.str());
-                        stop = this->listenInput(pid);
+                        stop = this->listenInput((int)sonPid);
                         if(stop) break;
                     }
                 }

@@ -19,10 +19,9 @@ class Logger {
 private:
     static Logger* instance;
 public:
-    void log(LogLevel level, string message, bool bold, bool endLine, bool prefixSymbol);
-    void log(LogLevel level, string message, bool bold, bool endLine) {log(level, message, bold, endLine, true);};
-    void log(LogLevel level, string message, bool bold) {log(level, message, bold, true, true);};
-    void log(LogLevel level, string message) {log(level, message, false, true, true);};
+    void log(LogLevel level, const string& message, bool bold, bool prefixSymbol);
+    void log(LogLevel level, const string& message, bool bold) {log(level, message, bold, true);};
+    void log(LogLevel level, const string& message) {log(level, message, false, true);};
     static Logger getLogger();
 };
 

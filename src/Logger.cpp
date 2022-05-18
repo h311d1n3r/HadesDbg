@@ -7,12 +7,12 @@ Logger* Logger::instance;
 
 Logger Logger::getLogger() {
     if(!Logger::instance) {
-        *Logger::instance = Logger();
+        Logger::instance = new Logger();
     }
     return *Logger::instance;
 }
 
-void Logger::log(LogLevel level, string message, bool bold, bool endLine, bool prefixSymbol) {
+void Logger::log(LogLevel level, const string& message, bool bold, bool prefixSymbol) {
     stringstream prefix;
     prefix << "\033[" << (bold?"1":"0") << ";";
     switch(level) {
