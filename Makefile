@@ -21,7 +21,7 @@ bin/lib:
 	@mkdir -p $(HADESDBG_OUT_LIB)
 	@echo "Compiling asmjit..."
 	@mkdir -p $(ASMJIT_OUT)
-	@cd $(ASMJIT_OUT) && cmake .. $(QUIET_MODE) && make $(QUIET_MODE)
+	@cd $(ASMJIT_OUT) && sh -c 'cmake .. 2>/dev/null' $(QUIET_MODE) && make $(QUIET_MODE)
 	@mv $(ASMJIT_OUT)/libasmjit.so $(HADESDBG_OUT_LIB)
 	@rm -rf $(ASMJIT_OUT)
 	@echo "Libraries successfully compiled !"
