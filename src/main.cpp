@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
             Logger::getLogger().log(LogLevel::FATAL, msg.str());
         }
     } else {
-        Logger::getLogger().log(LogLevel::FATAL, "You need to specify more parameters -> \033[;37mhadesdbg binary");
+        printHelpMessage();
     }
     return 0;
 }
