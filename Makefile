@@ -1,13 +1,13 @@
 HADESDBG_NAME=hadesdbg
 
-HADESDBG_SRC=./src
-HADESDBG_INC=./headers
-HADESDBG_OUT=./bin
-HADESDBG_OUT_LIB=./bin/lib
+HADESDBG_SRC=src
+HADESDBG_INC=headers
+HADESDBG_OUT=bin
+HADESDBG_OUT_LIB=bin/lib
 
-ASMJIT_DIR=./lib/asmjit
-ASMJIT_INC=./lib/asmjit/src
-ASMJIT_OUT=./lib/asmjit/bin
+ASMJIT_DIR=lib/asmjit
+ASMJIT_INC=lib/asmjit/src
+ASMJIT_OUT=lib/asmjit/bin
 ASMJIT_URL=https://github.com/asmjit/asmjit.git
 ASMJIT_COMMIT=a4cb51b532af0f8137c4182914244c3b05d7745f
 
@@ -39,7 +39,7 @@ bin/lib:
 compile: bin/lib
 	@echo "Compiling project..."
 	@mkdir -p $(HADESDBG_OUT)
-	@$(CC) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(LIB_INC) -o$(HADESDBG_OUT)/$(HADESDBG_NAME) $(COMPILE_FLAGS) -L$(HADESDBG_OUT_LIB) -lasmjit -Wl,-rpath,$(HADESDBG_OUT_LIB)
+	@$(CC) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(LIB_INC) -o$(HADESDBG_OUT)/$(HADESDBG_NAME) $(COMPILE_FLAGS) -L"`pwd`/$(HADESDBG_OUT_LIB)" -lasmjit -Wl,-rpath,"`pwd`/$(HADESDBG_OUT_LIB)"
 	@chmod 777 $(HADESDBG_OUT)/$(HADESDBG_NAME)
 	@echo "Project successfully compiled !"
 			  
