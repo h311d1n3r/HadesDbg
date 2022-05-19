@@ -28,15 +28,10 @@ bin/lib:
 
 compile: bin/lib
 	@echo "Compiling project..."
-ifneq ($(shell id -u), 0)
-	@echo "You need root priviledges in order to compile the project !"
-else
 	@mkdir -p $(HADESDBG_OUT)
-	@cp $(HADESDBG_OUT_LIB)/* /usr/local/lib
-	@$(CC) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(LIB_INC) -o$(HADESDBG_OUT)/$(HADESDBG_NAME) $(COMPILE_FLAGS) -lasmjit
+	@$(CC) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(LIB_INC) -o$(HADESDBG_OUT)/$(HADESDBG_NAME) $(COMPILE_FLAGS) -L$(HADESDBG_OUT_LIB) -lasmjit -Wl,-rpath,$(HADESDBG_OUT_LIB)
 	@chmod 777 $(HADESDBG_OUT)/$(HADESDBG_NAME)
 	@echo "Project successfully compiled !"
-endif
 			  
 clean:
 	@echo "Cleaning output directory..."
