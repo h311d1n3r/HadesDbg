@@ -83,7 +83,7 @@ void HadesDbg::fixEntryBreakpoint() {
 
 void HadesDbg::handleExit() {
     stringstream lsofCommand;
-    lsofCommand << "lsof \"" << this->params.binaryPath << "\"";
+    lsofCommand << "lsof -w \"" << this->params.binaryPath << "\"";
     string lsofResult = executeCommand(lsofCommand.str().c_str());
     vector<string> lsofResLines;
     split(lsofResult, '\n', lsofResLines);
@@ -219,6 +219,33 @@ void HadesDbg::writeMem(pid_t sonPid, BigInt addr, BigInt val) {
         this_thread::sleep_for(chrono::milliseconds(500));
     }
     free(buffer);
+}
+
+map<string, BigInt> HadesDbg::readRegs(pid_t sonPid) {
+    const char readRegsBytes[] = {
+            Code::READ_REGS,
+    };
+    string filePath = this->prepareAction(sonPid, (char*)readRegsBytes, sizeof(readRegsBytes));
+    char* buffer = (char*) malloc(0x2 + registerFromName.size() * 0x8);
+    while(true) {
+        ifstream fileReader;
+        fileReader.open(filePath, ios::binary | ios::in);
+        fileReader.read(buffer, 0x2 + registerFromName.size() * 0x8);
+        fileReader.close();
+        if(buffer[0] == Code::TARGET_READY) break;
+        this_thread::sleep_for(chrono::milliseconds(500));
+    }
+    map<string, BigInt> regs;
+    unsigned char counter = 0;
+    for(string regName : orderedRegsNames) {
+        BigInt regVal = 0;
+        memcpy(&regVal, buffer + 0x1 + (registerFromName.size() - counter - 1) * sizeof(regVal), sizeof(regVal));
+        if(registerFromName[regName] == Register::RIP) regVal = regVal - this->effectiveEntry + this->params.entryAddress;
+        regs[regName] = regVal;
+        counter++;
+    }
+    free(buffer);
+    return regs;
 }
 
 void HadesDbg::endBp(pid_t sonPid) {
@@ -478,8 +505,8 @@ vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
     //write memory
     a.bind(writeMemLabel);
     a.cmp(byte_ptr(r8), Code::WRITE_MEM);
-    asmjit::Label closePipeLabel = a.newLabel();
-    a.jne(closePipeLabel);
+    asmjit::Label readRegsLabel = a.newLabel();
+    a.jne(readRegsLabel);
     a.inc(r8);
     a.mov(r9, qword_ptr(r8));
     a.add(r8, 8);
@@ -497,6 +524,36 @@ vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
     a.syscall();
     a.mov(rsi, r8);
     a.mov(rdx, 2);
+    a.mov(rax, 1);
+    a.syscall();
+
+    //read registers
+    a.bind(readRegsLabel);
+    a.cmp(byte_ptr(r8), Code::READ_REGS);
+    asmjit::Label closePipeLabel = a.newLabel();
+    a.jne(closePipeLabel);
+    a.mov(byte_ptr(r8), Code::TARGET_READY);
+    a.inc(r8);
+    a.add(rsp, 8);
+    a.xor_(rcx, rcx);
+    asmjit::Label loopReadRegsLabel = a.newLabel();
+    a.bind(loopReadRegsLabel);
+    a.pop(r9);
+    a.mov(qword_ptr(r8), r9);
+    a.add(r8, 8);
+    a.inc(rcx);
+    a.cmp(rcx, registerFromName.size());
+    a.jb(loopReadRegsLabel);
+    a.mov(byte_ptr(r8), 0x0);
+    a.sub(rsp, 0x8 + registerFromName.size() * 0x8);
+    a.sub(r8, 0x1 + registerFromName.size() * 0x8);
+    a.mov(rdi, rbx);
+    a.mov(rsi, 0);
+    a.mov(rdx, 0);
+    a.mov(rax, 8);
+    a.syscall();
+    a.mov(rsi, r8);
+    a.mov(rdx, 0x2 + registerFromName.size() * 8);
     a.mov(rax, 1);
     a.syscall();
 
@@ -721,8 +778,44 @@ bool HadesDbg::listenInput(pid_t sonPid) {
                         Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
                     } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid address ! \033[;37mwritemem address hex_chain\033[;33m");
                 } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mwritemem address hex_chain\033[;33m");
-            }
-            else Logger::getLogger().log(LogLevel::WARNING, "Unknown command !");
+            } else if(cmdParams[0] == "readregs" || cmdParams[0] == "rrs") {
+                stringstream regsAskStr;
+                regsAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m for \033[;37mall registers\033[;36m...";
+                Logger::getLogger().log(LogLevel::INFO, regsAskStr.str());
+                map<string, BigInt> regs = readRegs(sonPid);
+                Logger::getLogger().log(LogLevel::SUCCESS, "");
+                stringstream regsStr;
+                unsigned char counter = 0;
+                for(string regName : orderedRegsNames) {
+                    regsStr << regName << ":" << (regName.length() == 2 ? " " : "") << " \033[;37m" << setfill('0') << setw(2 * sizeof(BigInt)) << hex << regs[regName] << "\033[;32m";
+                    if(counter < regs.size() - 1) {
+                        if(((counter + 1) % 3) == 0) regsStr << endl;
+                        else regsStr << "    ";
+                    }
+                    counter++;
+                }
+                Logger::getLogger().log(LogLevel::SUCCESS, regsStr.str(), false, false);
+            } else if(cmdParams[0] == "info" || cmdParams[0] == "i") {
+                stringstream breakpointsStr;
+                map<BigInt, unsigned char>::iterator breakpoint;
+                unsigned char counter = 0;
+                for(breakpoint = this->params.breakpoints.begin(); breakpoint != this->params.breakpoints.end(); breakpoint++) {
+                    breakpointsStr << "\033[;37m0x" << hex << +breakpoint->first << "\033[;36m";
+                    if(counter < this->params.breakpoints.size() - 1)  breakpointsStr << ", ";
+                    counter++;
+                }
+                stringstream infoStr;
+                infoStr << "Debug info:" << endl
+                    << "File: " << "\033[;37m" << this->params.binaryPath << "\033[;36m" << endl
+                    << "Process ID (original): " << "\033[;37m0x" << hex << +this->pid << "\033[;36m" << endl
+                    << "Process ID (current): " << "\033[;37m0x" << hex << +sonPid << "\033[;36m" << endl
+                    << "Entry point (ELF header): " << "\033[;37m0x" << hex << +this->fileEntry << "\033[;36m" << endl
+                    << "Entry point (effective): " << "\033[;37m0x" << hex << +this->effectiveEntry << "\033[;36m" << endl
+                    << "Entry point (defined): " << "\033[;37m0x" << hex << +this->params.entryAddress << "\033[;36m" << endl
+                    << "Effective offset: displayedAddress + " << "\033[;37m0x" << hex << +(this->effectiveEntry - this->params.entryAddress) << "\033[;36m" << endl
+                    << "Breakpoints: " << breakpointsStr.str();
+                Logger::getLogger().log(LogLevel::INFO, infoStr.str());
+            } else Logger::getLogger().log(LogLevel::WARNING, "Unknown command !");
         } else Logger::getLogger().log(LogLevel::WARNING, "Please input a command !");
     }
 }

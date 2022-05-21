@@ -33,6 +33,7 @@ private:
     BigInt readMem(pid_t sonPid, BigInt addr);
     void writeReg(pid_t sonPid, Register reg, BigInt val);
     void writeMem(pid_t sonPid, BigInt addr, BigInt val);
+    map<string, BigInt> readRegs(pid_t sonPid);
     void endBp(pid_t sonPid);
     bool listenInput(pid_t sonPid);
 public:
@@ -43,6 +44,7 @@ public:
         READ_MEM = 0x4,
         WRITE_REG = 0x5,
         WRITE_MEM = 0x6,
+        READ_REGS = 0x7,
     };
     explicit HadesDbg(BinaryParams params) : params(move(params)){
         this->fileEntry = 0;

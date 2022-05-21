@@ -3,6 +3,7 @@
 
 #include <string>
 #include <map>
+#include <vector>
 
 using namespace std;
 
@@ -27,5 +28,7 @@ enum Register {
 };
 
 extern map<string, Register> registerFromName;
+
+extern vector<string> orderedRegsNames;
 
 #endif //HADESDBG_REGS_H

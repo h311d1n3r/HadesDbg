@@ -17,5 +17,25 @@ map<string, Register> registerFromName = {
         {"R14", Register::R14},
         {"R15", Register::R15},
         {"RBP", Register::RBP},
-        {"RIP", Register::RIP},
+        {"RIP", Register::RIP}
+};
+
+vector<string> orderedRegsNames = {
+        "RSP",
+        "RAX",
+        "RBX",
+        "RCX",
+        "RDX",
+        "RDI",
+        "RSI",
+        "R8",
+        "R9",
+        "R10",
+        "R11",
+        "R12",
+        "R13",
+        "R14",
+        "R15",
+        "RBP",
+        "RIP"
 };
