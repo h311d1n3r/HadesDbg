@@ -19,10 +19,12 @@ To deal with this hard task, **HadesDbg** attaches to the target, **injects inst
 ### Debugging commands
 The following commands can be used when the target hits a breakpoint :  
 `readreg` or `rr` -> Returns value of the specified register. e.g: 'readreg rax'  
+`readregs` or `rrs` -> Returns values of all registers at once.  
 `readmem` or `rm` -> Returns n bytes at the specified address of target. e.g: 'readmem 0x562f9d400000 0xa'  
 `writereg` or `wr` -> Writes the specified value into the specified register. e.g: 'writereg rsi 0x12345678'  
 `writemem` or `wm` -> Writes the specified hex chain at the specified address of target. e.g: 'writemem @0x401ab5 0102030405abcdef'  
 `run` or `r` -> Resumes execution after a breakpoint was hit.  
+`info` or `i` -> Displays information concerning the debugging session.  
 `exit` or `e` -> Ends the debugging session.
 ### Example
 #### Command
