@@ -12,10 +12,13 @@ To deal with this hard task, **HadesDbg** attaches to the target, **injects inst
 3. Add the generated `bin` directory to your path using `PATH=$PATH:~/path/to/the/repo/bin`.
 ## How to use ?
 ### Syntax
-`hadesdbg binary [-param value]`
+`hadesdbg binary [-param value] [--flag]`
 ### Parameters
 `entry` -> Specifies the program entry point. e.g: 'entry 0x401000'  
 `bp` -> Injects a breakpoint at the given address. **Notice that you must specify a size (at least 14) that corresponds to an amount of bytes that can be replaced without cutting an instruction in two.** e.g: 'bp 0x401080:14'  
+`args` -> Specifies the arguments to be passed to the traced binary. e.g: 'args "./name.bin hello world"'  
+### Flags
+`help` -> Displays a help message  
 ### Debugging commands
 The following commands can be used when the target hits a breakpoint :  
 `readreg` or `rr` -> Returns value of the specified register. e.g: 'readreg rax'  
