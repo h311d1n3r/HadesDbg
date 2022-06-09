@@ -43,7 +43,7 @@ Here is a screenshot of a hit breakpoint during a debugging session :
 ## Warning
 **This software must only be used to carry out lawful experiments and I am not responsible for any breach of this rule !**
 
-### Support me ;)
+## Support me !
 **This project was not designed for profit but any donation is welcome :**  
   
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate?hosted_button_id=FGPVL34PVQVZJ)
