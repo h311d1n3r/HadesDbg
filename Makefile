@@ -4,6 +4,10 @@ HADESDBG_SRC=src
 HADESDBG_INC=headers
 HADESDBG_OUT=bin
 HADESDBG_OUT_LIB=bin/lib
+HADESDBG_OUT=./bin
+HADESDBG_TEST_SRC_32=./test/src/x86
+HADESDBG_TEST_SRC_64=./test/src/x64
+HADESDBG_TEST_OUT=./test/bin
 
 ASMJIT_DIR=lib/asmjit
 ASMJIT_INC=lib/asmjit/src
@@ -42,6 +46,17 @@ compile: bin/lib
 	@$(CC) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(LIB_INC) -o$(HADESDBG_OUT)/$(HADESDBG_NAME) $(COMPILE_FLAGS) -L"`pwd`/$(HADESDBG_OUT_LIB)" -lasmjit -Wl,-rpath,"`pwd`/$(HADESDBG_OUT_LIB)"
 	@chmod 777 $(HADESDBG_OUT)/$(HADESDBG_NAME)
 	@echo "Project successfully compiled !"
+
+.PHONY: test
+test:
+	@mkdir -p $(HADESDBG_TEST_OUT)
+	@echo "Compiling test binaries..."
+	@for test_src_file in $(HADESDBG_TEST_SRC_32)/* ; do \
+		$(CC) $(COMPILE_FLAGS) $(COMPILE_32_FLAGS) $$test_src_file -o$(HADESDBG_TEST_OUT)/`echo $$test_src_file | rev | cut -d'/' -f 1 | rev | cut -d'.' -f 1)` ; \
+	done
+	@for test_src_file in $(HADESDBG_TEST_SRC_64)/* ; do \
+		$(CC) $(COMPILE_FLAGS) $(COMPILE_64_FLAGS) $$test_src_file -o$(HADESDBG_TEST_OUT)/`echo $$test_src_file | rev | cut -d'/' -f 1 | rev | cut -d'.' -f 1)` ; \
+	done
 			  
 clean:
 	@echo "Cleaning output directory..."
