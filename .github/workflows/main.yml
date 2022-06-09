@@ -23,7 +23,7 @@ jobs:
       run: echo "`pwd`/bin" >> $GITHUB_PATH
     - name: compile_tests
       run: make test
-    - name: run_test_1
-      run: |
-        cd test/bin
-        hadesdbg ./test_1 -entry 0x1040 -bp 0x1131:15
+#   - name: run_test_1
+#     run: |
+#       cd test/bin
+#       hadesdbg ./test_1 -entry 0x1040 -bp 0x1131:15
