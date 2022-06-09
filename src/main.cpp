@@ -38,6 +38,8 @@ void printHelpMessage() {
     paramsList << "\033[1;33m   entry\033[0;36m -> Specifies the program entry point. e.g: 'entry 0x401000'" << endl;
     paramsList << "\033[1;33m   bp\033[0;36m -> Specifies a program breakpoint and the length of instructions to be replaced. e.g: 'bp 0x401000:20'" << endl;
     paramsList << "\033[1;33m   args\033[0;36m -> Specifies the arguments to be passed to the traced binary. e.g: 'args \"./name.bin hello world\"'" << endl;
+    paramsList << "\033[1;33m   script\033[0;36m -> Provides a script to automatically execute the debugger. e.g: 'script \"./auto.hscript\"'" << endl;
+    paramsList << "\033[1;33m   output\033[0;36m -> Redirects the formatted output of the tool into a file. e.g: 'output \"./output.hout\"'" << endl;
     Logger::getLogger().log(LogLevel::INFO, paramsList.str(), false, false);
     Logger::getLogger().log(LogLevel::INFO, "Flags:", false, false);
     stringstream flagsList;
@@ -108,6 +110,10 @@ bool analyseParam(const string& param, const string& val) {
             vector<string> args;
             split(val, ' ', args);
             params.binaryArgs = args;
+        } else if(paramName == "script") {
+            //TODO
+        } else if(paramName == "output") {
+            //TODO
         }
     }
     return true;
