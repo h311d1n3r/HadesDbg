@@ -1,0 +1,29 @@
+name: main
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  check_app:
+    runs-on: ubuntu-latest
+    steps:
+    - name: clone_project
+      uses: actions/checkout@v3
+    - name: prepare_env
+      run: |
+        sudo apt update
+        sudo apt install gcc-multilib g++-multilib
+    - name: compile
+      run: make
+    - name: append_path
+      run: echo "`pwd`/bin" >> $GITHUB_PATH
+    - name: compile_tests
+      run: make test
+    - name: run_test_1
+      run: |
+        cd test/bin
+        hadesdbg ./test_1 -entry 0x1040 -bp 0x1131:15
