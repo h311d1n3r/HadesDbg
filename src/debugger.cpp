@@ -625,26 +625,21 @@ vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
 }
 
 vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection(vector<unsigned char> pipeModeAssemblyVec) {
-    /*
-    mov rax, 0x9
-    mov rdi, 0x0
-    mov rsi, 0x0
-    mov rdx, 0x7
-    mov r10, 0x22
-    mov r8, -0x1
-    mov r9, 0x0
-    syscall
-    */
-    unsigned char allocArr[] = {
-        0x48,0xc7,0xc0,0x09,0x00,0x00,0x00,0x48,0xc7,
-        0xc7,0x00,0x00,0x00,0x00,0x48,0xc7,0xc6,0x00,
-        0x00,0x00,0x00,0x48,0xc7,0xc2,0x07,0x00,0x00,
-        0x00,0x49,0xc7,0xc2,0x22,0x00,0x00,0x00,0x49,
-        0xc7,0xc0,0xff,0xff,0xff,0xff,0x49,0xc7,0xc1,
-        0x00,0x00,0x00,0x00,0x0f,0x05
-    };
-    vector<unsigned char> vec;
-    vec.insert(vec.end(), allocArr, allocArr + sizeof(allocArr));
+    asmjit::JitRuntime rt;
+    asmjit::CodeHolder code;
+    code.init(rt.environment());
+    Assembler a(&code);
+
+    a.mov(rax, 0x9);
+    a.mov(rdi, 0x0);
+    a.mov(rsi, 0x0);
+    a.mov(rdx, 0x7);
+    a.mov(r10, 0x22);
+    a.mov(r8, -0x1);
+    a.mov(r9, 0x0);
+    a.syscall();
+
+    vector<unsigned char> vec(a.bufferData(), a.bufferPtr());
     vec.push_back(0x50);
     unsigned char movArr[] = {0x48,0xc7,0x00};
     unsigned char addArr[] = {0x48,0x83,0xc0,0x04};
@@ -837,10 +832,16 @@ void HadesDbg::run() {
     sprintf(file, "/proc/%ld/mem", (long)this->pid);
     this->memoryFd = open(file, O_RDWR);
     if(this->memoryFd != -1) {
-        unsigned char breakpointCall[] = {
-            0x50,0x48,0xb8,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0xff,0xd0
-        };
+        asmjit::JitRuntime rt;
+        asmjit::CodeHolder code;
+        code.init(rt.environment());
+        Assembler a(&code);
+        a.push(rax);
+        a.movabs(rax, 0x0000000000000000);
+        a.call(rax);
+        vector<unsigned char> breakpointCallVec(a.bufferData(), a.bufferPtr());
+        unsigned char* breakpointCall = reinterpret_cast<unsigned char*>(breakpointCallVec.data());
+        unsigned int breakpointCallSize = breakpointCallVec.size();
         user_regs_struct regs = {};
         Logger::getLogger().log(LogLevel::SUCCESS, "Target reached entry breakpoint !");
         Logger::getLogger().log(LogLevel::INFO, "Injecting pipe mode in child process...");
@@ -888,7 +889,7 @@ void HadesDbg::run() {
             BigInt breakpointAddr = injectData->first;
             BigInt allocStart = injectData->second;
             memcpy(breakpointCall + 0x3, &allocStart, sizeof(allocStart));
-            pwrite(this->memoryFd, &breakpointCall, sizeof(breakpointCall), (long)breakpointAddr);
+            pwrite(this->memoryFd, &breakpointCall, breakpointCallSize, (long)breakpointAddr);
         }
         Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
         if(!ptrace(PTRACE_DETACH,this->pid,NULL,NULL)) {

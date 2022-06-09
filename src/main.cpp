@@ -111,11 +111,27 @@ bool analyseParam(const string& param, const string& val) {
             split(val, ' ', args);
             params.binaryArgs = args;
         } else if(paramName == "script") {
-            cout << val << endl;
-            //TODO
+            string path = filesystem::current_path().u8string() + "/" + val;
+            params.scriptFile = new ifstream();
+            params.scriptFile->open(path);
+            if (params.scriptFile->is_open()) {
+                Logger::getLogger().log(LogLevel::SUCCESS, "Script file found !");
+            } else {
+                stringstream msg;
+                msg << "Couldn't open script file \033[;37m" << path << "\033[;31m !";
+                Logger::getLogger().log(LogLevel::FATAL, msg.str());
+            }
         } else if(paramName == "output") {
-            cout << val << endl;
-            //TODO
+            string path = filesystem::current_path().u8string() + "/" + val;
+            params.outputFile = new ofstream();
+            params.outputFile->open(path);
+            if (params.outputFile->is_open()) {
+                Logger::getLogger().log(LogLevel::SUCCESS, "Output file found !");
+            } else {
+                stringstream msg;
+                msg << "Couldn't open output file \033[;37m" << path << "\033[;31m !";
+                Logger::getLogger().log(LogLevel::FATAL, msg.str());
+            }
         }
     }
     return true;

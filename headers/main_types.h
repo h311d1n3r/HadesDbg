@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <fstream>
 
 using namespace std;
 
@@ -12,6 +13,8 @@ struct BinaryParams {
     vector<string> binaryArgs;
     unsigned long long int entryAddress;
     map<unsigned long long int, unsigned char> breakpoints;
+    ifstream* scriptFile;
+    ofstream* outputFile;
 };
 
 #endif
