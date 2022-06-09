@@ -111,8 +111,10 @@ bool analyseParam(const string& param, const string& val) {
             split(val, ' ', args);
             params.binaryArgs = args;
         } else if(paramName == "script") {
+            cout << val << endl;
             //TODO
         } else if(paramName == "output") {
+            cout << val << endl;
             //TODO
         }
     }
