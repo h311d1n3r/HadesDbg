@@ -13,6 +13,7 @@ struct BinaryParams {
     vector<string> binaryArgs;
     unsigned long long int entryAddress;
     map<unsigned long long int, unsigned char> breakpoints;
+    map<unsigned long long int, unsigned int> bpIndexFromAddr;
     ifstream* scriptFile;
     ofstream* outputFile;
 };

@@ -21,6 +21,7 @@ private:
     int memoryFd;
     BinaryParams params;
     bool fixedEntryBreakpoint = false;
+    map<unsigned int, vector<string>> scriptByBreakpoint;
     static void convertArgs(const vector<string>& args, char** execArgs);
     bool readBinaryHeader();
     void fixEntryBreakpoint();
@@ -35,7 +36,9 @@ private:
     void writeMem(pid_t sonPid, BigInt addr, BigInt val);
     map<string, BigInt> readRegs(pid_t sonPid);
     void endBp(pid_t sonPid);
+    void execCommand(pid_t sonPid, string input);
     bool listenInput(pid_t sonPid);
+    bool readScriptFile();
 public:
     enum DbgCode {
         TARGET_READY = 0x1,

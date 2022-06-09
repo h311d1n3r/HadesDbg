@@ -82,6 +82,7 @@ void HadesDbg::fixEntryBreakpoint() {
 }
 
 void HadesDbg::handleExit() {
+    if(this->params.outputFile && this->params.outputFile->is_open()) this->params.outputFile->close();
     stringstream lsofCommand;
     lsofCommand << "lsof -w \"" << this->params.binaryPath << "\"";
     string lsofResult = executeCommand(lsofCommand.str().c_str());
@@ -658,149 +659,137 @@ vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection(vector<unsigned
     return vec;
 }
 
-bool HadesDbg::listenInput(pid_t sonPid) {
-    string input;
-    while(true) {
-        getline(cin, input);
-        vector<string> cmdParams;
-        split(input, ' ', cmdParams);
-        if(!cmdParams.empty()) {
-            if(cmdParams[0] == "exit" || cmdParams[0] == "e") return true;
-            else if(cmdParams[0] == "run" || cmdParams[0] == "r") {
-                stringstream runAskStr;
-                runAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m to resume execution...";
-                Logger::getLogger().log(LogLevel::INFO, runAskStr.str());
-                this->endBp(sonPid);
-                Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
-                return false;
-            }
-            else if(cmdParams[0] == "readreg" || cmdParams[0] == "rr") {
-                if(cmdParams.size() > 1) {
-                    string regName = toUppercase(cmdParams[1]);
-                    if (registerFromName.count(regName)) {
-                        stringstream regAskStr;
-                        regAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m for \033[;37m" << regName << " \033[;36mvalue...";
-                        Register reg = registerFromName[regName];
-                        Logger::getLogger().log(LogLevel::INFO, regAskStr.str());
-                        BigInt regValue = readReg(sonPid, reg);
-                        stringstream regValStr;
-                        regValStr << regName << ": \033[;37m" << hex << regValue << "\033[;32m";
-                        Logger::getLogger().log(LogLevel::SUCCESS, regValStr.str());
-                    } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid register ! \033[;37mreadreg register\033[;33m");
-                } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mreadreg register\033[;33m");
-            }
-            else if(cmdParams[0] == "readmem" || cmdParams[0] == "rm") {
-                if(cmdParams.size() > 2) {
-                    string addrStr = cmdParams[1];
-                    bool entryRelative = false;
-                    if(!addrStr.find('@')) {
-                        entryRelative = true;
-                        addrStr = addrStr.substr(1);
-                    }
-                    BigInt addr = 0;
-                    if(inputToNumber(addrStr, addr)) {
-                        string lenStr = cmdParams[2];
-                        BigInt len = 0;
-                        if(inputToNumber(lenStr, len)) {
-                            if(len > 0) {
-                                stringstream memAskStr;
-                                memAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m for \033[;37m" << hex << len
-                                          << " \033[;36mbytes at address \033[;37m" << hex << addr << "\033[;36m...";
-                                Logger::getLogger().log(LogLevel::INFO, memAskStr.str());
-                                stringstream memValStr;
-                                memValStr << hex << addr << ":";
-                                Logger::getLogger().log(LogLevel::SUCCESS, memValStr.str());
-                                for(int i = 0; i < len; i+=8) {
-                                    BigInt memValue = readMem(sonPid, entryRelative ? (addr + i - this->params.entryAddress + this->effectiveEntry) : addr + i);
-                                    for(int i2 = 0; i2 < sizeof(memValue) && i+i2 < len; i2++) {
-                                        cout << hex << setfill('0') << setw(2) << +(memValue >> (i2 * 8) & 0xff);
-                                        if(i2+1 < sizeof(memValue) && i+i2+1 < len) cout << " ";
-                                    }
-                                    cout << endl;
+void HadesDbg::execCommand(pid_t sonPid, string input) {
+    vector<string> cmdParams;
+    split(input, ' ', cmdParams);
+    if(!cmdParams.empty()) {
+        if(cmdParams[0] == "readreg" || cmdParams[0] == "rr") {
+            if(cmdParams.size() > 1) {
+                string regName = toUppercase(cmdParams[1]);
+                if (registerFromName.count(regName)) {
+                    stringstream regAskStr;
+                    regAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m for \033[;37m" << regName << " \033[;36mvalue...";
+                    Register reg = registerFromName[regName];
+                    Logger::getLogger().log(LogLevel::INFO, regAskStr.str());
+                    BigInt regValue = readReg(sonPid, reg);
+                    stringstream regValStr;
+                    regValStr << regName << ": \033[;37m" << hex << regValue << "\033[;32m";
+                    Logger::getLogger().log(LogLevel::SUCCESS, regValStr.str());
+                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid register ! \033[;37mreadreg register\033[;33m");
+            } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mreadreg register\033[;33m");
+        }
+        else if(cmdParams[0] == "readmem" || cmdParams[0] == "rm") {
+            if(cmdParams.size() > 2) {
+                string addrStr = cmdParams[1];
+                bool entryRelative = false;
+                if(!addrStr.find('@')) {
+                    entryRelative = true;
+                    addrStr = addrStr.substr(1);
+                }
+                BigInt addr = 0;
+                if(inputToNumber(addrStr, addr)) {
+                    string lenStr = cmdParams[2];
+                    BigInt len = 0;
+                    if(inputToNumber(lenStr, len)) {
+                        if(len > 0) {
+                            stringstream memAskStr;
+                            memAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m for \033[;37m" << hex << len
+                                      << " \033[;36mbytes at address \033[;37m" << hex << addr << "\033[;36m...";
+                            Logger::getLogger().log(LogLevel::INFO, memAskStr.str());
+                            stringstream memValStr;
+                            memValStr << hex << addr << ":";
+                            Logger::getLogger().log(LogLevel::SUCCESS, memValStr.str());
+                            for(int i = 0; i < len; i+=8) {
+                                BigInt memValue = readMem(sonPid, entryRelative ? (addr + i - this->params.entryAddress + this->effectiveEntry) : addr + i);
+                                for(int i2 = 0; i2 < sizeof(memValue) && i+i2 < len; i2++) {
+                                    cout << hex << setfill('0') << setw(2) << +(memValue >> (i2 * 8) & 0xff);
+                                    if(i2+1 < sizeof(memValue) && i+i2+1 < len) cout << " ";
                                 }
-                                Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
-                            } else Logger::getLogger().log(LogLevel::WARNING, "Length must be a strictly positive value ! \033[;37mreadmem address length\033[;33m");
-                        } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid length ! \033[;37mreadmem address length\033[;33m");
-                    } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid address ! \033[;37mreadmem address length\033[;33m");
-                } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mreadmem address length\033[;33m");
-            }
-            else if(cmdParams[0] == "writereg" || cmdParams[0] == "wr") {
-                if(cmdParams.size() > 2) {
-                    string regName = toUppercase(cmdParams[1]);
-                    if (registerFromName.count(regName)) {
-                        Register reg = registerFromName[regName];
-                        string valStr = cmdParams[2];
-                        BigInt val;
-                        if(inputToNumber(valStr, val)) {
-                            stringstream regEditStr;
-                            regEditStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m to set \033[;37m" << regName
-                                       << "\033[;36m to \033[;37m" << hex << val << "\033[;36m...";
-                            Logger::getLogger().log(LogLevel::INFO, regEditStr.str());
-                            this->writeReg(sonPid, reg, val);
-                            Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
-                        } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a number ! \033[;37mwritereg register value\033[;33m");
-                    } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid register ! \033[;37mwritereg register value\033[;33m");
-                } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mwritereg register value\033[;33m");
-            }
-            else if(cmdParams[0] == "writemem" || cmdParams[0] == "wm") {
-                if(cmdParams.size() > 2) {
-                    string addrStr = cmdParams[1];
-                    bool entryRelative = false;
-                    if(!addrStr.find('@')) {
-                        entryRelative = true;
-                        addrStr = addrStr.substr(1);
-                    }
-                    BigInt addr;
-                    if(inputToNumber(addrStr, addr)) {
-                        string hexChain = cmdParams[2];
-                        stringstream memEditStr;
-                        memEditStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m to write \033[;37m" << hexChain
-                                   << "\033[;36m at \033[;37m" << hex << addr << "\033[;36m...";
-                        Logger::getLogger().log(LogLevel::INFO, memEditStr.str());
-                        for(int i = 0; i < hexChain.length(); i += 2 * sizeof(BigInt)) {
-                            BigInt val = 0;
-                            unsigned long substrLen = i + 2 * sizeof(BigInt) > hexChain.length() ? hexChain.length() - i : 2 * sizeof(BigInt);
-                            if(inputToNumber("0x"+hexChain.substr(i, substrLen), val)) {
-                                val = invertEndian(val);
-                                if(substrLen < 2 * sizeof(BigInt)) {
-                                    BigInt oldVal = readMem(sonPid, entryRelative ? (addr + (i / 2) - this->params.entryAddress + this->effectiveEntry) : addr + (i / 2));
-                                    val >>= sizeof(BigInt) * 8 - (substrLen * 8 / 2);
-                                    val += (oldVal >> (substrLen * 8 / 2)) << (substrLen * 8 / 2);
-                                }
-                                this->writeMem(sonPid, entryRelative ? (addr + (i / 2) - this->params.entryAddress + this->effectiveEntry) : addr + (i / 2), val);
-                            } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid hexadecimal chain ! \033[;37mwritemem address hex_chain\033[;33m");
-                        }
+                                cout << endl;
+                            }
+                            Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
+                        } else Logger::getLogger().log(LogLevel::WARNING, "Length must be a strictly positive value ! \033[;37mreadmem address length\033[;33m");
+                    } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid length ! \033[;37mreadmem address length\033[;33m");
+                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid address ! \033[;37mreadmem address length\033[;33m");
+            } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mreadmem address length\033[;33m");
+        }
+        else if(cmdParams[0] == "writereg" || cmdParams[0] == "wr") {
+            if(cmdParams.size() > 2) {
+                string regName = toUppercase(cmdParams[1]);
+                if (registerFromName.count(regName)) {
+                    Register reg = registerFromName[regName];
+                    string valStr = cmdParams[2];
+                    BigInt val;
+                    if(inputToNumber(valStr, val)) {
+                        stringstream regEditStr;
+                        regEditStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m to set \033[;37m" << regName
+                                   << "\033[;36m to \033[;37m" << hex << val << "\033[;36m...";
+                        Logger::getLogger().log(LogLevel::INFO, regEditStr.str());
+                        this->writeReg(sonPid, reg, val);
                         Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
-                    } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid address ! \033[;37mwritemem address hex_chain\033[;33m");
-                } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mwritemem address hex_chain\033[;33m");
-            } else if(cmdParams[0] == "readregs" || cmdParams[0] == "rrs") {
-                stringstream regsAskStr;
-                regsAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m for \033[;37mall registers\033[;36m...";
-                Logger::getLogger().log(LogLevel::INFO, regsAskStr.str());
-                map<string, BigInt> regs = readRegs(sonPid);
-                Logger::getLogger().log(LogLevel::SUCCESS, "");
-                stringstream regsStr;
-                unsigned char counter = 0;
-                for(string regName : orderedRegsNames) {
-                    regsStr << regName << ":" << (regName.length() == 2 ? " " : "") << " \033[;37m" << setfill('0') << setw(2 * sizeof(BigInt)) << hex << regs[regName] << "\033[;32m";
-                    if(counter < regs.size() - 1) {
-                        if(((counter + 1) % 3) == 0) regsStr << endl;
-                        else regsStr << "    ";
+                    } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a number ! \033[;37mwritereg register value\033[;33m");
+                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid register ! \033[;37mwritereg register value\033[;33m");
+            } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mwritereg register value\033[;33m");
+        }
+        else if(cmdParams[0] == "writemem" || cmdParams[0] == "wm") {
+            if(cmdParams.size() > 2) {
+                string addrStr = cmdParams[1];
+                bool entryRelative = false;
+                if(!addrStr.find('@')) {
+                    entryRelative = true;
+                    addrStr = addrStr.substr(1);
+                }
+                BigInt addr;
+                if(inputToNumber(addrStr, addr)) {
+                    string hexChain = cmdParams[2];
+                    stringstream memEditStr;
+                    memEditStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m to write \033[;37m" << hexChain
+                               << "\033[;36m at \033[;37m" << hex << addr << "\033[;36m...";
+                    Logger::getLogger().log(LogLevel::INFO, memEditStr.str());
+                    for(int i = 0; i < hexChain.length(); i += 2 * sizeof(BigInt)) {
+                        BigInt val = 0;
+                        unsigned long substrLen = i + 2 * sizeof(BigInt) > hexChain.length() ? hexChain.length() - i : 2 * sizeof(BigInt);
+                        if(inputToNumber("0x"+hexChain.substr(i, substrLen), val)) {
+                            val = invertEndian(val);
+                            if(substrLen < 2 * sizeof(BigInt)) {
+                                BigInt oldVal = readMem(sonPid, entryRelative ? (addr + (i / 2) - this->params.entryAddress + this->effectiveEntry) : addr + (i / 2));
+                                val >>= sizeof(BigInt) * 8 - (substrLen * 8 / 2);
+                                val += (oldVal >> (substrLen * 8 / 2)) << (substrLen * 8 / 2);
+                            }
+                            this->writeMem(sonPid, entryRelative ? (addr + (i / 2) - this->params.entryAddress + this->effectiveEntry) : addr + (i / 2), val);
+                        } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid hexadecimal chain ! \033[;37mwritemem address hex_chain\033[;33m");
                     }
-                    counter++;
+                    Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
+                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid address ! \033[;37mwritemem address hex_chain\033[;33m");
+            } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mwritemem address hex_chain\033[;33m");
+        } else if(cmdParams[0] == "readregs" || cmdParams[0] == "rrs") {
+            stringstream regsAskStr;
+            regsAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m for \033[;37mall registers\033[;36m...";
+            Logger::getLogger().log(LogLevel::INFO, regsAskStr.str());
+            map<string, BigInt> regs = readRegs(sonPid);
+            Logger::getLogger().log(LogLevel::SUCCESS, "");
+            stringstream regsStr;
+            unsigned char counter = 0;
+            for(string regName : orderedRegsNames) {
+                regsStr << regName << ":" << (regName.length() == 2 ? " " : "") << " \033[;37m" << setfill('0') << setw(2 * sizeof(BigInt)) << hex << regs[regName] << "\033[;32m";
+                if(counter < regs.size() - 1) {
+                    if(((counter + 1) % 3) == 0) regsStr << endl;
+                    else regsStr << "    ";
                 }
-                Logger::getLogger().log(LogLevel::SUCCESS, regsStr.str(), false, false);
-            } else if(cmdParams[0] == "info" || cmdParams[0] == "i") {
-                stringstream breakpointsStr;
-                map<BigInt, unsigned char>::iterator breakpoint;
-                unsigned char counter = 0;
-                for(breakpoint = this->params.breakpoints.begin(); breakpoint != this->params.breakpoints.end(); breakpoint++) {
-                    breakpointsStr << "\033[;37m0x" << hex << +breakpoint->first << "\033[;36m";
-                    if(counter < this->params.breakpoints.size() - 1)  breakpointsStr << ", ";
-                    counter++;
-                }
-                stringstream infoStr;
-                infoStr << "Debug info:" << endl
+                counter++;
+            }
+            Logger::getLogger().log(LogLevel::SUCCESS, regsStr.str(), false, false);
+        } else if(cmdParams[0] == "info" || cmdParams[0] == "i") {
+            stringstream breakpointsStr;
+            map<BigInt, unsigned char>::iterator breakpoint;
+            unsigned char counter = 0;
+            for(breakpoint = this->params.breakpoints.begin(); breakpoint != this->params.breakpoints.end(); breakpoint++) {
+                breakpointsStr << "\033[;37m0x" << hex << +breakpoint->first << "\033[;36m";
+                if(counter < this->params.breakpoints.size() - 1)  breakpointsStr << ", ";
+                counter++;
+            }
+            stringstream infoStr;
+            infoStr << "Debug info:" << endl
                     << "File: " << "\033[;37m" << this->params.binaryPath << "\033[;36m" << endl
                     << "Process ID (original): " << "\033[;37m0x" << hex << +this->pid << "\033[;36m" << endl
                     << "Process ID (current): " << "\033[;37m0x" << hex << +sonPid << "\033[;36m" << endl
@@ -809,14 +798,77 @@ bool HadesDbg::listenInput(pid_t sonPid) {
                     << "Entry point (defined): " << "\033[;37m0x" << hex << +this->params.entryAddress << "\033[;36m" << endl
                     << "Effective offset: displayedAddress + " << "\033[;37m0x" << hex << +(this->effectiveEntry - this->params.entryAddress) << "\033[;36m" << endl
                     << "Breakpoints: " << breakpointsStr.str();
-                Logger::getLogger().log(LogLevel::INFO, infoStr.str());
-            } else Logger::getLogger().log(LogLevel::WARNING, "Unknown command !");
-        } else Logger::getLogger().log(LogLevel::WARNING, "Please input a command !");
+            Logger::getLogger().log(LogLevel::INFO, infoStr.str());
+        } else Logger::getLogger().log(LogLevel::WARNING, "Unknown command !");
+    } else Logger::getLogger().log(LogLevel::WARNING, "Please input a command !");
+}
+
+bool HadesDbg::listenInput(pid_t sonPid) {
+    string input;
+    while(true) {
+        getline(cin, input);
+        if(input == "exit" || input == "e") return true;
+        else if(input == "run" || input == "r") {
+            stringstream runAskStr;
+            runAskStr << "Asking \033[;37m" << hex << +sonPid << "\033[;36m to resume execution...";
+            Logger::getLogger().log(LogLevel::INFO, runAskStr.str());
+            this->endBp(sonPid);
+            Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
+            return false;
+        } else this->execCommand(sonPid, input);
     }
+    return true;
+}
+
+bool HadesDbg::readScriptFile() {
+    string line;
+    BigInt currentBp = -1;
+    unsigned int lineNumber = 0;
+    vector<string> currentVec;
+    while (getline(*this->params.scriptFile, line)) {
+        if(!line.rfind("bp ", 0)) {
+            if(!currentVec.empty() && currentBp > 0) {
+                this->scriptByBreakpoint[currentBp] = currentVec;
+                currentVec.clear();
+            }
+            if(!inputToNumber(line.substr(string("bp ").length()), currentBp)) {
+                stringstream msg;
+                msg << "Error line \033[;37m" << +lineNumber << "\033[;31m : Breakpoint index must be a number !";
+                Logger::getLogger().log(LogLevel::FATAL, msg.str());
+                return false;
+            } else if(currentBp <= 0) {
+                stringstream msg;
+                msg << "Error line \033[;37m" << +lineNumber << "\033[;31m : Breakpoint index must be >= 1 !";
+                Logger::getLogger().log(LogLevel::FATAL, msg.str());
+                return false;
+            } else if(this->scriptByBreakpoint.count(currentBp)) {
+                stringstream msg;
+                msg << "Error line \033[;37m" << +lineNumber << "\033[;31m : Instructions have already been set for this breakpoint !";
+                Logger::getLogger().log(LogLevel::FATAL, msg.str());
+                return false;
+            }
+        } else if(currentBp > 0) {
+            if(line.find_first_not_of(' ') != string::npos && line.find_first_not_of('\t') != string::npos) {
+                currentVec.push_back(line);
+            }
+        } else {
+            stringstream msg;
+            msg << "Error line \033[;37m" << +lineNumber << "\033[;31m : Breakpoint index was not set ! Use \"bp\" command before breakpoint instructions...";
+            Logger::getLogger().log(LogLevel::FATAL, msg.str());
+            return false;
+        }
+        lineNumber++;
+    }
+    if(!currentVec.empty() && currentBp > 0) this->scriptByBreakpoint[currentBp] = currentVec;
+    this->params.scriptFile->close();
+    return true;
 }
 
 void HadesDbg::run() {
     if(!this->readBinaryHeader()) return;
+    if(this->params.scriptFile && this->params.scriptFile->is_open()) {
+        if(!this->readScriptFile()) return;
+    }
     this->pid = fork();
     if(!this->pid) {
         ptrace(PTRACE_TRACEME, 0, NULL, NULL);
@@ -840,7 +892,7 @@ void HadesDbg::run() {
         a.movabs(rax, 0x0000000000000000);
         a.call(rax);
         vector<unsigned char> breakpointCallVec(a.bufferData(), a.bufferPtr());
-        unsigned char* breakpointCall = reinterpret_cast<unsigned char*>(breakpointCallVec.data());
+        unsigned char* breakpointCall(&breakpointCallVec[0]);
         unsigned int breakpointCallSize = breakpointCallVec.size();
         user_regs_struct regs = {};
         Logger::getLogger().log(LogLevel::SUCCESS, "Target reached entry breakpoint !");
@@ -889,7 +941,7 @@ void HadesDbg::run() {
             BigInt breakpointAddr = injectData->first;
             BigInt allocStart = injectData->second;
             memcpy(breakpointCall + 0x3, &allocStart, sizeof(allocStart));
-            pwrite(this->memoryFd, &breakpointCall, breakpointCallSize, (long)breakpointAddr);
+            pwrite(this->memoryFd, breakpointCall, breakpointCallSize, (long)breakpointAddr);
         }
         Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
         if(!ptrace(PTRACE_DETACH,this->pid,NULL,NULL)) {
@@ -905,13 +957,35 @@ void HadesDbg::run() {
                             Logger::getLogger().log(LogLevel::ERROR, "Unable to read breakpoint PID !");
                         }
                         BigInt sonRip = this->readReg((int)sonPid, Register::RIP);
+                        unsigned int bpIndex = this->params.bpIndexFromAddr[sonRip];
                         stringstream breakpointHit;
-                        breakpointHit << "Breakpoint hit !" << endl;
+                        breakpointHit << "Breakpoint \033[;37m" << +bpIndex << "\033[;36m hit !" << endl;
                         breakpointHit << "PID: \033[;37m" << hex << +sonPid << "\033[;36m" << endl;
                         breakpointHit << "Address: \033[;37m" << hex << +sonRip << "\033[;36m";
                         Logger::getLogger().log(LogLevel::INFO, breakpointHit.str());
-                        stop = this->listenInput((int)sonPid);
-                        if(stop) break;
+                        if(this->scriptByBreakpoint.count(bpIndex)) {
+                            vector<string> commands = this->scriptByBreakpoint[bpIndex];
+                            for(string command : commands) {
+                                stringstream commandMsg;
+                                commandMsg << "Script >> \033[;37m" << command << "\033[;36m";
+                                Logger::getLogger().log(LogLevel::INFO, commandMsg.str());
+                                if(command == "exit" || command == "e") {
+                                    stop = true;
+                                    break;
+                                } else this->execCommand((int) sonPid, command);
+                            }
+                            if(!stop) {
+                                stringstream runAskStr;
+                                runAskStr << "Asking \033[;37m" << hex << +sonPid << "\033[;36m to resume execution...";
+                                Logger::getLogger().log(LogLevel::INFO, runAskStr.str());
+                                this->endBp(sonPid);
+                                Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
+                            }
+                        }
+                        else {
+                            stop = this->listenInput((int) sonPid);
+                        }
+                        if (stop) break;
                     }
                 }
                 this_thread::sleep_for(chrono::milliseconds(500));

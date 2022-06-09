@@ -22,6 +22,7 @@ const string AUTHOR = "h311d1n3r";
 
 BinaryParams params;
 HadesDbg* dbg;
+unsigned int bpIndex = 1;
 
 void printHelpMessage() {
     Logger::getLogger().log(LogLevel::INFO, TOOL_TITLE, false, false);
@@ -106,6 +107,8 @@ bool analyseParam(const string& param, const string& val) {
             }
             len = lenBuf;
             params.breakpoints[addr] = len;
+            params.bpIndexFromAddr[addr] = bpIndex;
+            bpIndex++;
         } else if(paramName == "args") {
             vector<string> args;
             split(val, ' ', args);
