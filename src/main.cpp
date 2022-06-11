@@ -130,6 +130,7 @@ bool analyseParam(const string& param, const string& val) {
             params.outputFile->open(path);
             if (params.outputFile->is_open()) {
                 Logger::getLogger().log(LogLevel::SUCCESS, "Output file found !");
+                Logger::getLogger().setOutputFile(params.outputFile);
             } else {
                 stringstream msg;
                 msg << "Couldn't open output file \033[;37m" << path << "\033[;31m !";

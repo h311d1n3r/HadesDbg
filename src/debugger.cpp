@@ -249,14 +249,20 @@ map<string, BigInt> HadesDbg::readRegs(pid_t sonPid) {
     return regs;
 }
 
-void HadesDbg::endBp(pid_t sonPid) {
+bool HadesDbg::endBp(pid_t sonPid) {
     const char endBpBytes[] = {
         Code::END_BREAKPOINT
     };
     string filePath = this->prepareAction(sonPid, (char*)endBpBytes, sizeof(endBpBytes));
+    unsigned int counter = 0;
+    unsigned int pause = 500;
+    unsigned int timeout = 5 * 1000;
     while(filesystem::exists(filePath)) {
-        this_thread::sleep_for(chrono::milliseconds(500));
+        this_thread::sleep_for(chrono::milliseconds(pause));
+        if(counter * pause > timeout) return false;
+        counter++;
     }
+    return true;
 }
 
 vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
@@ -822,8 +828,8 @@ bool HadesDbg::listenInput(pid_t sonPid) {
             stringstream runAskStr;
             runAskStr << "Asking \033[;37m" << hex << +sonPid << "\033[;36m to resume execution...";
             Logger::getLogger().log(LogLevel::INFO, runAskStr.str());
-            this->endBp(sonPid);
-            Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
+            if(this->endBp(sonPid)) Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
+            else Logger::getLogger().log(LogLevel::ERROR, "An error occured !");
             return false;
         } else this->execCommand(sonPid, input);
     }
@@ -1000,8 +1006,8 @@ void HadesDbg::run() {
                                 stringstream runAskStr;
                                 runAskStr << "Asking \033[;37m" << hex << +sonPid << "\033[;36m to resume execution...";
                                 Logger::getLogger().log(LogLevel::INFO, runAskStr.str());
-                                this->endBp(sonPid);
-                                Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
+                                if(this->endBp(sonPid)) Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
+                                else Logger::getLogger().log(LogLevel::ERROR, "An error occured !");
                             }
                         }
                         else {

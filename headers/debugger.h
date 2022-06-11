@@ -35,7 +35,7 @@ private:
     void writeReg(pid_t sonPid, Register reg, BigInt val);
     void writeMem(pid_t sonPid, BigInt addr, BigInt val);
     map<string, BigInt> readRegs(pid_t sonPid);
-    void endBp(pid_t sonPid);
+    bool endBp(pid_t sonPid);
     void execCommand(pid_t sonPid, string input);
     bool listenInput(pid_t sonPid);
     bool readScriptFile();
