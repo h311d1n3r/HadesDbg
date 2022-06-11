@@ -795,7 +795,7 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
             unsigned char counter = 0;
             for(breakpoint = this->params.breakpoints.begin(); breakpoint != this->params.breakpoints.end(); breakpoint++) {
                 breakpointsStr << "\033[;37m0x" << hex << +breakpoint->first << "\033[;36m";
-                if(counter < this->params.breakpoints.size() - 1)  breakpointsStr << ", ";
+                if(counter < this->params.breakpoints.size() - 1) breakpointsStr << ", ";
                 counter++;
             }
             stringstream infoStr;
@@ -950,8 +950,20 @@ void HadesDbg::run() {
         for(injectData = allocAddrFromBpAddr.begin(); injectData != allocAddrFromBpAddr.end(); injectData++) {
             BigInt breakpointAddr = injectData->first;
             BigInt allocStart = injectData->second;
+            unsigned char breakpointSize = this->params.breakpoints.at(breakpointAddr - this->effectiveEntry + this->params.entryAddress);
             memcpy(breakpointCall + 0x3, &allocStart, sizeof(allocStart));
             pwrite(this->memoryFd, breakpointCall, breakpointCallSize, (long)breakpointAddr);
+            unsigned char nopsAmount = breakpointSize - breakpointCallSize;
+            char* nopsArr = (char*) malloc(nopsAmount);
+            for(int i = 0; i < nopsAmount; i++) nopsArr[i] = 0x90;
+            if(nopsArr) {
+                pwrite(this->memoryFd, nopsArr, nopsAmount, (long)breakpointAddr + breakpointCallSize);
+                delete nopsArr;
+            } else {
+                Logger::getLogger().log(LogLevel::FATAL, "Failure...");
+                close(this->memoryFd);
+                this->handleExit();
+            }
         }
         Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
         if(!ptrace(PTRACE_DETACH,this->pid,NULL,NULL)) {
