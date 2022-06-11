@@ -26,8 +26,11 @@ jobs:
     - name: run_test_1
       run: |
         hadesdbg ./test/bin/test_1 -script ./test/scripts/test_1.hscript -output ./test_1.hout -entry 0x1040 -bp 0x1131:15
-        export A=$(md5sum ./test_1.hout | cut -d' ' -f1)
-        export B=$(md5sum ./test/results/test_1.hout | cut -d' ' -f1)
+        if [[ $(md5sum ./test_1.hout | cut -d' ' -f1) == $(md5sum ./test/results/test_1.hout | cut -d' ' -f1) ]]; then
+              echo "TEST=true" >> "$GITHUB_ENV"
+        else
+              echo "TEST=false" >> "$GITHUB_ENV"
+        fi
     - name: test_1_check
-      if: ${{ A != B }}
+      if: env.TEST != 'true'
       run: exit 1
