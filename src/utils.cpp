@@ -55,3 +55,14 @@ unsigned long long int invertEndian(unsigned long long int val) {
     }
     return ret;
 }
+
+string removeConsoleChars(string consoleOut) {
+    string ret = "";
+    for(int i = 0; i < consoleOut.length(); i++) {
+        char currentChar = consoleOut[i];
+        if(currentChar == '\033') {
+            i += 5;
+        } else ret += currentChar;
+    }
+    return ret;
+}

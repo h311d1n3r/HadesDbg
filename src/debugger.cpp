@@ -675,6 +675,9 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                     stringstream regValStr;
                     regValStr << regName << ": \033[;37m" << hex << regValue << "\033[;32m";
                     Logger::getLogger().log(LogLevel::SUCCESS, regValStr.str());
+                    if(this->params.outputFile && this->params.outputFile->is_open()) {
+                        *this->params.outputFile << removeConsoleChars(regValStr.str()) << endl;
+                    }
                 } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid register ! \033[;37mreadreg register\033[;33m");
             } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mreadreg register\033[;33m");
         }
@@ -701,11 +704,15 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                             Logger::getLogger().log(LogLevel::SUCCESS, memValStr.str());
                             for(int i = 0; i < len; i+=8) {
                                 BigInt memValue = readMem(sonPid, entryRelative ? (addr + i - this->params.entryAddress + this->effectiveEntry) : addr + i);
+                                stringstream output;
                                 for(int i2 = 0; i2 < sizeof(memValue) && i+i2 < len; i2++) {
-                                    cout << hex << setfill('0') << setw(2) << +(memValue >> (i2 * 8) & 0xff);
+                                    output << hex << setfill('0') << setw(2) << +(memValue >> (i2 * 8) & 0xff);
                                     if(i2+1 < sizeof(memValue) && i+i2+1 < len) cout << " ";
                                 }
-                                cout << endl;
+                                cout << output.str() << endl;
+                                if(this->params.outputFile && this->params.outputFile->is_open()) {
+                                    *this->params.outputFile << removeConsoleChars(output.str()) << endl;
+                                }
                             }
                             Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
                         } else Logger::getLogger().log(LogLevel::WARNING, "Length must be a strictly positive value ! \033[;37mreadmem address length\033[;33m");
@@ -779,6 +786,9 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                 counter++;
             }
             Logger::getLogger().log(LogLevel::SUCCESS, regsStr.str(), false, false);
+            if(this->params.outputFile && this->params.outputFile->is_open()) {
+                *this->params.outputFile << removeConsoleChars(regsStr.str()) << endl;
+            }
         } else if(cmdParams[0] == "info" || cmdParams[0] == "i") {
             stringstream breakpointsStr;
             map<BigInt, unsigned char>::iterator breakpoint;

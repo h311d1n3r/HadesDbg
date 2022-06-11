@@ -11,5 +11,6 @@ string toUppercase(string input);
 bool endsWith(std::string const &value, std::string const &ending);
 string executeCommand(const char* cmd);
 unsigned long long int invertEndian(unsigned long long int val);
+string removeConsoleChars(string consoleOut);
 
 #endif

@@ -1,3 +1,5 @@
 bp 1
 rr rdi
+wr rdi 0x11223344aabbccdd
+rr rdi
 e
