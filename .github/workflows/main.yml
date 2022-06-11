@@ -24,5 +24,7 @@ jobs:
     - name: compile_tests
       run: make test
     - name: run_test_1
-      run: |
-        hadesdbg ./test/bin/test_1 -script ./test/scripts/test_1.hscript -entry 0x1040 -bp 0x1131:15
+      run: hadesdbg ./test/bin/test_1 -script ./test/scripts/test_1.hscript -output ./test_1.hout -entry 0x1040 -bp 0x1131:15
+    - name: test_1_check
+      if: (md5sum ./test_1.hout | cut -d' ' -f1) != (md5sum ./test/results/test_1.hout | cut -d' ' -f1)
+      run: exit 1
