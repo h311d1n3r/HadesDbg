@@ -29,5 +29,5 @@ jobs:
         export A=$(md5sum ./test_1.hout | cut -d' ' -f1)
         export B=$(md5sum ./test/results/test_1.hout | cut -d' ' -f1)
     - name: test_1_check
-      if: ${{ A }} != ${{ B }}
+      if: ${{ A != B }}
       run: exit 1
