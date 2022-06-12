@@ -39,6 +39,8 @@ private:
     void execCommand(pid_t sonPid, string input);
     bool listenInput(pid_t sonPid);
     bool readScriptFile();
+    void reportError(string error);
+    void reportFatalError(string error);
 public:
     enum DbgCode {
         TARGET_READY = 0x1,

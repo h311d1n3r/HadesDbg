@@ -46,17 +46,17 @@ bool HadesDbg::readBinaryHeader() {
                             Logger::getLogger().log(LogLevel::INFO, msg.str());
                             binaryWrite.close();
                             return true;
-                        } else Logger::getLogger().log(LogLevel::FATAL, "The specified file can't be run on a Linux architecture.");
-                    } else Logger::getLogger().log(LogLevel::FATAL, "HadesDbg currently handles little endian files only.");
-                } else Logger::getLogger().log(LogLevel::FATAL, "HadesDbg currently handles x64 files only.");
-            } else Logger::getLogger().log(LogLevel::FATAL, "The specified binary is not a ELF file.");
+                        } else this->reportFatalError("The specified file can't be run on a Linux architecture.");
+                    } else this->reportFatalError("HadesDbg currently handles little endian files only.");
+                } else this->reportFatalError("HadesDbg currently handles x64 files only.");
+            } else this->reportFatalError("The specified binary is not a ELF file.");
         } else {
             stringstream error;
             error << "The specified binary file is only " << len << " bytes long.";
-            Logger::getLogger().log(LogLevel::FATAL, error.str());
+            this->reportFatalError(error.str());
         }
         binaryRead.close();
-    } else Logger::getLogger().log(LogLevel::FATAL, "An error occured while trying to open the specified binary file.");
+    } else this->reportFatalError("An error occured while trying to open the specified binary file.");
     return false;
 }
 
@@ -109,10 +109,7 @@ void HadesDbg::handleExit() {
         const string path = entry.path().u8string();
         if (endsWith(toUppercase(path), ".HADES")) {
             BigInt sonPid = 0;
-            if (!inputToNumber("0x" + path.substr(path.length() - 14, 8), sonPid)) {
-                Logger::getLogger().log(LogLevel::ERROR, "Unable to read breakpoint PID !");
-                if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Error" << endl;
-            }
+            if (!inputToNumber("0x" + path.substr(path.length() - 14, 8), sonPid)) this->reportError("Unable to read breakpoint PID !");
             //Check if process with pid exists
             if(!kill((int)sonPid, 0)) {
                 stringstream killStr;
@@ -830,14 +827,21 @@ bool HadesDbg::listenInput(pid_t sonPid) {
             runAskStr << "Asking \033[;37m" << hex << +sonPid << "\033[;36m to resume execution...";
             Logger::getLogger().log(LogLevel::INFO, runAskStr.str());
             if(this->endBp(sonPid)) Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
-            else {
-                Logger::getLogger().log(LogLevel::ERROR, "An error occured !");
-                if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Error" << endl;
-            }
+            else this->reportError("An error occured !");
             return false;
         } else this->execCommand(sonPid, input);
     }
     return true;
+}
+
+void HadesDbg::reportError(string error) {
+    Logger::getLogger().log(LogLevel::ERROR, error);
+    if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Error" << endl;
+}
+
+void HadesDbg::reportFatalError(string error) {
+    Logger::getLogger().log(LogLevel::FATAL, error);
+    if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Fatal error" << endl;
 }
 
 bool HadesDbg::readScriptFile() {
@@ -854,20 +858,17 @@ bool HadesDbg::readScriptFile() {
             if(!inputToNumber(line.substr(string("bp ").length()), currentBp)) {
                 stringstream msg;
                 msg << "Error line \033[;37m" << +lineNumber << "\033[;31m : Breakpoint index must be a number !";
-                Logger::getLogger().log(LogLevel::FATAL, msg.str());
-                if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Fatal error" << endl;
+                this->reportFatalError(msg.str());
                 return false;
             } else if(currentBp <= 0) {
                 stringstream msg;
                 msg << "Error line \033[;37m" << +lineNumber << "\033[;31m : Breakpoint index must be >= 1 !";
-                Logger::getLogger().log(LogLevel::FATAL, msg.str());
-                if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Fatal error" << endl;
+                this->reportFatalError(msg.str());
                 return false;
             } else if(this->scriptByBreakpoint.count(currentBp)) {
                 stringstream msg;
                 msg << "Error line \033[;37m" << +lineNumber << "\033[;31m : Instructions have already been set for this breakpoint !";
-                Logger::getLogger().log(LogLevel::FATAL, msg.str());
-                if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Fatal error" << endl;
+                this->reportFatalError(msg.str());
                 return false;
             }
         } else if(currentBp > 0) {
@@ -877,8 +878,7 @@ bool HadesDbg::readScriptFile() {
         } else {
             stringstream msg;
             msg << "Error line \033[;37m" << +lineNumber << "\033[;31m : Breakpoint index was not set ! Use \"bp\" command before breakpoint instructions...";
-            Logger::getLogger().log(LogLevel::FATAL, msg.str());
-            if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Fatal error" << endl;
+            this->reportFatalError(msg.str());
             return false;
         }
         lineNumber++;
@@ -948,8 +948,7 @@ void HadesDbg::run() {
             ptrace(PTRACE_GETREGS,this->pid,NULL,&regs);
             unsigned long long allocStart = regs.rax;
             if(!allocStart) {
-                Logger::getLogger().log(LogLevel::FATAL, "Failure...");
-                if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Fatal error" << endl;
+                this->reportFatalError("Failure...");
                 close(this->memoryFd);
                 this->handleExit();
             }
@@ -975,8 +974,7 @@ void HadesDbg::run() {
                 pwrite(this->memoryFd, nopsArr, nopsAmount, (long)breakpointAddr + breakpointCallSize);
                 delete nopsArr;
             } else {
-                Logger::getLogger().log(LogLevel::FATAL, "Failure...");
-                if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Fatal error" << endl;
+                this->reportFatalError("Failure...");
                 close(this->memoryFd);
                 this->handleExit();
             }
@@ -992,8 +990,7 @@ void HadesDbg::run() {
                     if(endsWith(toUppercase(path), ".HADES")) {
                         BigInt sonPid = 0;
                         if(!inputToNumber("0x"+path.substr(path.length()-14, 8), sonPid)) {
-                            Logger::getLogger().log(LogLevel::ERROR, "Unable to read breakpoint PID !");
-                            if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Fatal error" << endl;
+                            this->reportError("Unable to read breakpoint PID !");
                         }
                         BigInt sonRip = this->readReg((int)sonPid, Register::RIP);
                         unsigned int bpIndex = this->params.bpIndexFromAddr[sonRip];
@@ -1018,10 +1015,7 @@ void HadesDbg::run() {
                                 runAskStr << "Asking \033[;37m" << hex << +sonPid << "\033[;36m to resume execution...";
                                 Logger::getLogger().log(LogLevel::INFO, runAskStr.str());
                                 if(this->endBp(sonPid)) Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
-                                else {
-                                    Logger::getLogger().log(LogLevel::ERROR, "An error occured !");
-                                    if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Error" << endl;
-                                }
+                                else this->reportError("An error occured !");
                             }
                         }
                         else {
@@ -1033,8 +1027,8 @@ void HadesDbg::run() {
                 this_thread::sleep_for(chrono::milliseconds(500));
             }
             Logger::getLogger().log(LogLevel::INFO, "Ending process...");
-        } else Logger::getLogger().log(LogLevel::FATAL, "Failed to detach from child process...");
+        } else this->reportFatalError("Failed to detach from child process...");
         close(this->memoryFd);
-    } else Logger::getLogger().log(LogLevel::FATAL, "Unable to access memory of running target. Missing rights ?");
+    } else this->reportFatalError("Unable to access memory of running target. Missing rights ?");
     this->handleExit();
 }
