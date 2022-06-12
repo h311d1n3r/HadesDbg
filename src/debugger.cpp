@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <utils.h>
 #include <sys/ptrace.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <iostream>
 #include <asmjit/asmjit.h>
@@ -249,13 +250,16 @@ map<string, BigInt> HadesDbg::readRegs(pid_t sonPid) {
 
 bool HadesDbg::endBp(pid_t sonPid) {
     const char endBpBytes[] = {
-        Code::END_BREAKPOINT
+        Code::END_BREAKPOINT,
     };
+    struct stat fileInfo;
+    BigInt baseTime = time(&fileInfo.st_ctime);
     string filePath = this->prepareAction(sonPid, (char*)endBpBytes, sizeof(endBpBytes));
     unsigned int counter = 0;
     unsigned int pause = 500;
     unsigned int timeout = 5 * 1000;
-    while(filesystem::exists(filePath)) {
+    int res = 0;
+    while(stat(filePath.c_str(), &fileInfo) == 0 && baseTime >= time(&fileInfo.st_ctime)) {
         this_thread::sleep_for(chrono::milliseconds(pause));
         if(counter * pause > timeout) return false;
         counter++;
