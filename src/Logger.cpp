@@ -27,17 +27,11 @@ void Logger::log(LogLevel level, const string& message, bool bold, bool prefixSy
             break;
         case LogLevel::ERROR:
             prefix << "35m" << (prefixSymbol ? "[?] " : "");
-            if(this->outputFile && this->outputFile->is_open()) *this->outputFile << "Error" << endl;
             break;
         case LogLevel::FATAL:
             prefix << "31m" << (prefixSymbol ? "[!] " : "");
-            if(this->outputFile && this->outputFile->is_open()) *this->outputFile << "Fatal error" << endl;
             break;
     }
     prefix << message << "\033[0m";
     cout << prefix.str() << endl;
-}
-
-void Logger::setOutputFile(ofstream* outputFile) {
-    this->outputFile = outputFile;
 }
