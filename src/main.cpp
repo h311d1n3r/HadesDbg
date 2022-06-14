@@ -48,6 +48,48 @@ void printHelpMessage() {
     Logger::getLogger().log(LogLevel::INFO, flagsList.str(), false, false);
 }
 
+bool addBreakpoint(string val) {
+    int delimiterIndex = (int)val.find(':');
+    if(delimiterIndex == string::npos) {
+        stringstream msg;
+        msg << "Breakpoints need to follow this format -> \033[;37maddress:length\033[;31m !";
+        Logger::getLogger().log(LogLevel::FATAL, msg.str());
+        return false;
+    }
+    string addrPart = val.substr(0, delimiterIndex);
+    string lenPart = val.substr(delimiterIndex + 1);
+    unsigned long long int addr = 0, lenBuf = 0;
+    unsigned char len;
+    if(!inputToNumber(addrPart, addr)) {
+        stringstream msg;
+        msg << "Specified breakpoint address \033[;37m" << addrPart << "\033[;31m is not a number !";
+        Logger::getLogger().log(LogLevel::FATAL, msg.str());
+        return false;
+    }
+    if(!inputToNumber(lenPart, lenBuf)) {
+        stringstream msg;
+        msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is not a number !";
+        Logger::getLogger().log(LogLevel::FATAL, msg.str());
+        return false;
+    }
+    if(lenBuf > 64) {
+        stringstream msg;
+        msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is greater than 64 !";
+        Logger::getLogger().log(LogLevel::FATAL, msg.str());
+        return false;
+    } else if(lenBuf < 12) {
+        stringstream msg;
+        msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is smaller than 12 !";
+        Logger::getLogger().log(LogLevel::FATAL, msg.str());
+        return false;
+    }
+    len = lenBuf;
+    params.breakpoints[addr] = len;
+    params.bpIndexFromAddr[addr] = bpIndex;
+    bpIndex++;
+    return true;
+}
+
 bool analyseParam(const string& param, const string& val) {
     if(!param.find("--")) {
         string paramName = param.substr(2);
@@ -71,44 +113,7 @@ bool analyseParam(const string& param, const string& val) {
                 return false;
             }
         } else if(paramName == "bp") {
-            int delimiterIndex = (int)val.find(':');
-            if(delimiterIndex == string::npos) {
-                stringstream msg;
-                msg << "Breakpoints need to follow this format -> \033[;37maddress:length\033[;31m !";
-                Logger::getLogger().log(LogLevel::FATAL, msg.str());
-                return false;
-            }
-            string addrPart = val.substr(0, delimiterIndex);
-            string lenPart = val.substr(delimiterIndex + 1);
-            unsigned long long int addr = 0, lenBuf = 0;
-            unsigned char len;
-            if(!inputToNumber(addrPart, addr)) {
-                stringstream msg;
-                msg << "Specified breakpoint address \033[;37m" << addrPart << "\033[;31m is not a number !";
-                Logger::getLogger().log(LogLevel::FATAL, msg.str());
-                return false;
-            }
-            if(!inputToNumber(lenPart, lenBuf)) {
-                stringstream msg;
-                msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is not a number !";
-                Logger::getLogger().log(LogLevel::FATAL, msg.str());
-                return false;
-            }
-            if(lenBuf > 64) {
-                stringstream msg;
-                msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is greater than 64 !";
-                Logger::getLogger().log(LogLevel::FATAL, msg.str());
-                return false;
-            } else if(lenBuf < 12) {
-                stringstream msg;
-                msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is smaller than 12 !";
-                Logger::getLogger().log(LogLevel::FATAL, msg.str());
-                return false;
-            }
-            len = lenBuf;
-            params.breakpoints[addr] = len;
-            params.bpIndexFromAddr[addr] = bpIndex;
-            bpIndex++;
+            if(!addBreakpoint(val)) return false;
         } else if(paramName == "args") {
             vector<string> args;
             split(val, ' ', args);
@@ -133,6 +138,33 @@ bool analyseParam(const string& param, const string& val) {
             } else {
                 stringstream msg;
                 msg << "Couldn't open output file \033[;37m" << path << "\033[;31m !";
+                Logger::getLogger().log(LogLevel::FATAL, msg.str());
+            }
+        } else if(paramName == "config") {
+            string path = filesystem::current_path().u8string() + "/" + val;
+            ifstream configFile = ifstream();
+            configFile.open(path);
+            if (configFile.is_open()) {
+                Logger::getLogger().log(LogLevel::SUCCESS, "Config file found ! Reading it...");
+                string line;
+                unsigned int bpIndex = 0;
+                while (getline(configFile, line)) {
+                    if (!line.rfind("entry ", 0)) {
+                        string entryAddr = line.substr(string("entry ").size());
+                        if(!inputToNumber(entryAddr, params.entryAddress)) {
+                            stringstream msg;
+                            msg << "Entry \033[;37m" << entryAddr << "\033[;31m is not a valid integer !";
+                            Logger::getLogger().log(LogLevel::FATAL, msg.str());
+                            return false;
+                        }
+                    } else if(!line.rfind("bp ", 0)) {
+                        string bpAddrStr = line.substr(string("bp ").size());
+                        if(!addBreakpoint(bpAddrStr)) return false;
+                    }
+                }
+            } else {
+                stringstream msg;
+                msg << "Couldn't open config file \033[;37m" << path << "\033[;31m !";
                 Logger::getLogger().log(LogLevel::FATAL, msg.str());
             }
         }
