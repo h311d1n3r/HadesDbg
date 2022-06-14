@@ -51,13 +51,13 @@ compile: bin/lib
 test:
 	@mkdir -p $(HADESDBG_TEST_OUT)
 	@echo "Compiling test binaries..."
-	@for test_src_file in $(HADESDBG_TEST_SRC_32)/* ; do \
-		$(CC) $(COMPILE_FLAGS) $(COMPILE_32_FLAGS) $$test_src_file -o$(HADESDBG_TEST_OUT)/`echo $$test_src_file | rev | cut -d'/' -f 1 | rev | cut -d'.' -f 1)` ; \
-	done
-	#@for test_src_file in $(HADESDBG_TEST_SRC_64)/* ; do \
-	#	$(CC) $(COMPILE_FLAGS) $(COMPILE_64_FLAGS) $$test_src_file -o$(HADESDBG_TEST_OUT)/`echo $$test_src_file | rev | cut -d'/' -f 1 | rev | cut -d'.' -f 1)` ; \
+	#@for test_src_file in $(HADESDBG_TEST_SRC_32)/* ; do \
+	#	$(CC) $(COMPILE_FLAGS) $(COMPILE_32_FLAGS) $$test_src_file -o$(HADESDBG_TEST_OUT)/`echo $$test_src_file | rev | cut -d'/' -f 1 | rev | cut -d'.' -f 1)` ; \
 	#done
-	#@echo "Done !"
+	@for test_src_file in $(HADESDBG_TEST_SRC_64)/* ; do \
+		$(CC) $(COMPILE_FLAGS) $(COMPILE_64_FLAGS) $$test_src_file -o$(HADESDBG_TEST_OUT)/`echo $$test_src_file | rev | cut -d'/' -f 1 | rev | cut -d'.' -f 1)` ; \
+	done
+	@echo "Done !"
 			  
 clean:
 	@echo "Cleaning output directory..."
