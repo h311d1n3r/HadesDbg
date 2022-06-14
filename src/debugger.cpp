@@ -689,10 +689,11 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                 } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid register ! \033[;37mreadreg register\033[;33m");
             } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mreadreg register\033[;33m");
         }
-        else if(cmdParams[0] == "readmem" || cmdParams[0] == "rm") {
+        else if(cmdParams[0] == "readmem" || cmdParams[0] == "rm" || cmdParams[0] == "readmem_ascii" || cmdParams[0] == "rma") {
             if(cmdParams.size() > 2) {
                 string addrStr = cmdParams[1];
                 bool entryRelative = false;
+                bool ascii = cmdParams[0] == "readmem_ascii" || cmdParams[0] == "rma";
                 if(!addrStr.find('@')) {
                     entryRelative = true;
                     addrStr = addrStr.substr(1);
@@ -710,17 +711,28 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                             stringstream memValStr;
                             memValStr << hex << addr << ":";
                             Logger::getLogger().log(LogLevel::SUCCESS, memValStr.str());
+                            stringstream output;
                             for(int i = 0; i < len; i+=8) {
                                 BigInt memValue = readMem(sonPid, entryRelative ? (addr + i - this->params.entryAddress + this->effectiveEntry) : addr + i);
-                                stringstream output;
                                 for(int i2 = 0; i2 < sizeof(memValue) && i+i2 < len; i2++) {
-                                    output << hex << setfill('0') << setw(2) << +(memValue >> (i2 * 8) & 0xff);
-                                    if(i2+1 < sizeof(memValue) && i+i2+1 < len) cout << " ";
+                                    if(!ascii) {
+                                        output << hex << setfill('0') << setw(2) << +(memValue >> (i2 * 8) & 0xff);
+                                        if(i2+1 < sizeof(memValue) && i+i2+1 < len) output << " ";
+                                    } else {
+                                        output << (char)(memValue >> (i2 * 8) & 0xff);
+                                    }
                                 }
-                                cout << output.str() << endl;
+                                if(!ascii) cout << output.str() << endl;
+                                else cout << output.str();
                                 if(this->params.outputFile && this->params.outputFile->is_open()) {
-                                    *this->params.outputFile << removeConsoleChars(output.str()) << endl;
+                                    if(!ascii) *this->params.outputFile << removeConsoleChars(output.str()) << endl;
+                                    else *this->params.outputFile << removeConsoleChars(output.str());
                                 }
+                                output.str("");
+                            }
+                            if(ascii) {
+                                cout << endl;
+                                if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << endl;
                             }
                             Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
                         } else Logger::getLogger().log(LogLevel::WARNING, "Length must be a strictly positive value ! \033[;37mreadmem address length\033[;33m");
