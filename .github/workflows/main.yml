@@ -9,7 +9,7 @@ on:
 
 jobs:
   check_app:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: clone_project
       uses: actions/checkout@v3
