@@ -19,6 +19,7 @@ To deal with this hard task, **HadesDbg** attaches to the target, **injects inst
 `args` -> Specifies the arguments to be passed to the traced binary. e.g: 'args "./name.bin hello world"'  
 `script` -> Provides a script to automatically execute the debugger. e.g: 'script "./auto.hscript"'  
 `output` -> Redirects the formatted output of the tool into a file. e.g: 'output "./output.hout"'  
+`config` -> Provides command parameters from a file. e.g: 'config "./config.hconf"'  
 ### Flags
 `help` -> Displays a help message.  
 ### Debugging commands

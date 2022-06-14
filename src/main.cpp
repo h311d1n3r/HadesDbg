@@ -41,6 +41,7 @@ void printHelpMessage() {
     paramsList << "\033[1;33m   args\033[0;36m -> Specifies the arguments to be passed to the traced binary. e.g: 'args \"./name.bin hello world\"'" << endl;
     paramsList << "\033[1;33m   script\033[0;36m -> Provides a script to automatically execute the debugger. e.g: 'script \"./auto.hscript\"'" << endl;
     paramsList << "\033[1;33m   output\033[0;36m -> Redirects the formatted output of the tool into a file. e.g: 'output \"./output.hout\"'" << endl;
+    paramsList << "\033[1;33m   config\033[0;36m -> Provides command parameters from a file. e.g: 'config \"./config.hconf\"'" << endl;
     Logger::getLogger().log(LogLevel::INFO, paramsList.str(), false, false);
     Logger::getLogger().log(LogLevel::INFO, "Flags:", false, false);
     stringstream flagsList;
