@@ -23,29 +23,18 @@ jobs:
       run: echo "`pwd`/bin" >> $GITHUB_PATH
     - name: compile_tests
       run: make test
-    - name: run_test_1
+    - name: run_tests
       run: |
-        hadesdbg ./test/bin/test_1 -script ./test/scripts/test_1.hscript -output ./test_1.hout -entry 0x1040 -bp 0x1131:15
-        if [[ $(md5sum ./test_1.hout | cut -d' ' -f1) == $(md5sum ./test/results/test_1.hout | cut -d' ' -f1) ]]; then
-              echo "TEST=true" >> "$GITHUB_ENV"
-        else
-              echo "TEST=false" >> "$GITHUB_ENV"
-        fi
-    - name: test_1_check
-      if: env.TEST != 'true'
-      run: |
-        cat ./test_1.hout
-        exit 1
-    - name: run_test_3
-      run: |
-        hadesdbg ./test/bin/test_3 -script ./test/scripts/test_3.hscript -output ./test_3.hout -entry 0x1040 -bp 0x1131:15 -bp 0x1140:17
-        if [[ $(md5sum ./test_3.hout | cut -d' ' -f1) == $(md5sum ./test/results/test_3.hout | cut -d' ' -f1) ]]; then
-              echo "TEST=true" >> "$GITHUB_ENV"
-        else
-              echo "TEST=false" >> "$GITHUB_ENV"
-        fi
-    - name: test_3_check
-      if: env.TEST != 'true'
-      run: |
-        cat ./test_3.hout
-        exit 1
+        for i in {1..`ls ./test/bin | wc -l`}
+        do
+              echo "Starting test n°$i"
+	      hadesdbg ./test/bin/test_$i -script ./test/scripts/test_$i.hscript -output ./test_$i.hout -entry 0x1040 -bp 0x1131:15
+	      if [[ $(md5sum ./test_$i.hout | cut -d' ' -f1) == $(md5sum ./test/results/test_$i.hout | cut -d' ' -f1) ]]; then
+	            echo "Success !"
+	      else
+	            echo "Failure !"
+	            echo "Content of result file :"
+	            cat ./test_$i.hout
+                    exit 1
+	      fi
+	done
