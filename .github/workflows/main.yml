@@ -17,6 +17,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install gcc-multilib g++-multilib
+        g++ --version
     - name: compile
       run: make
     - name: append_path
@@ -25,7 +26,6 @@ jobs:
       run: make test
     - name: run_tests
       run: |
-        xxd ./test/bin/test_3
         for i in $(seq 1 1 `ls ./test/bin | wc -l`)
         do
           echo "Starting test n°$i"
