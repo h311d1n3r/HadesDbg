@@ -1,0 +1,6 @@
+bp 1
+wr edi 0x12345
+
+bp 2
+rr edi
+e

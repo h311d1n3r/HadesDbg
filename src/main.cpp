@@ -19,6 +19,11 @@ const string TOOL_TITLE = "  _  _         _        ___  _          \n"
                           "                                  |___/ ";
 const string VERSION = "1.0";
 const string AUTHOR = "h311d1n3r";
+#if __x86_64__
+const string ARCHITECTURE = "64bit";
+#else
+const string ARCHITECTURE = "32bit";
+#endif
 
 BinaryParams params;
 HadesDbg* dbg;
@@ -32,6 +37,9 @@ void printHelpMessage() {
     stringstream author;
     author << " Author: " << AUTHOR;
     Logger::getLogger().log(LogLevel::INFO, author.str(), false, false);
+    stringstream arch;
+    arch << " Architecture: " << ARCHITECTURE;
+    Logger::getLogger().log(LogLevel::INFO, arch.str(), false, false);
     Logger::getLogger().log(LogLevel::INFO, "________________________________________\n", false, false);
     Logger::getLogger().log(LogLevel::INFO, "Syntax: \033[1;33mhadesdbg binary [-param value] [--flag]\n", false, false);
     Logger::getLogger().log(LogLevel::INFO, "Parameters:", false, false);

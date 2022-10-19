@@ -1,0 +1,4 @@
+bp 1
+wr edi 0x11223344
+rr edi
+e

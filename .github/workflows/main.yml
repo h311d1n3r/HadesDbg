@@ -23,13 +23,14 @@ jobs:
       run: echo "`pwd`/bin" >> $GITHUB_PATH
     - name: compile_tests
       run: make test
-    - name: run_tests
+    - name: run_tests_32
       run: |
-        for i in $(seq 1 1 `ls ./test/bin | wc -l`)
+      	echo "Running 32bit tests"
+        for i in $(seq 1 1 `ls ./test/bin/x86 | wc -l`)
         do
           echo "Starting test n°$i"
-          hadesdbg ./test/bin/test_$i -config ./test/configs/test_$i.hconf -script ./test/scripts/test_$i.hscript -output ./test_$i.hout
-          if [[ $(md5sum ./test_$i.hout | cut -d' ' -f1) == $(md5sum ./test/results/test_$i.hout | cut -d' ' -f1) ]]
+          hadesdbg ./test/bin/x86/test_$i -config ./test/configs/x86/test_$i.hconf -script ./test/scripts/x86/test_$i.hscript -output ./test_$i.hout
+          if [[ $(md5sum ./test_$i.hout | cut -d' ' -f1) == $(md5sum ./test/results/x86/test_$i.hout | cut -d' ' -f1) ]]
           then
             echo "Success !"
           else
@@ -39,3 +40,22 @@ jobs:
             exit 1
           fi
         done
+        rm -f *.hout
+    - name: run_tests_64
+      run: |
+      	echo "Running 64bit tests"
+        for i in $(seq 1 1 `ls ./test/bin/x64 | wc -l`)
+        do
+          echo "Starting test n°$i"
+          hadesdbg ./test/bin/x64/test_$i -config ./test/configs/x64/test_$i.hconf -script ./test/scripts/x64/test_$i.hscript -output ./test_$i.hout
+          if [[ $(md5sum ./test_$i.hout | cut -d' ' -f1) == $(md5sum ./test/results/x64/test_$i.hout | cut -d' ' -f1) ]]
+          then
+            echo "Success !"
+          else
+            echo "Failure !"
+            echo "Content of result file :"
+            cat ./test_$i.hout
+            exit 1
+          fi
+        done
+        rm -f *.hout

@@ -154,7 +154,11 @@ BigInt HadesDbg::readReg(pid_t sonPid, Register reg) {
     BigInt ret = 0;
     memcpy(&ret, buffer+0x1, sizeof(ret));
     free(buffer);
+#if __x86_64__
     if(reg == Register::RIP) ret = ret - this->effectiveEntry + this->params.entryAddress;
+#else
+    if(reg == Register::EIP) ret = ret - this->effectiveEntry + this->params.entryAddress;
+#endif
     return ret;
 }
 
@@ -240,7 +244,11 @@ map<string, BigInt> HadesDbg::readRegs(pid_t sonPid) {
     for(string regName : orderedRegsNames) {
         BigInt regVal = 0;
         memcpy(&regVal, buffer + 0x1 + (registerFromName.size() - counter - 1) * sizeof(regVal), sizeof(regVal));
+#if __x86_64__
         if(registerFromName[regName] == Register::RIP) regVal = regVal - this->effectiveEntry + this->params.entryAddress;
+#else
+        if(registerFromName[regName] == Register::EIP) regVal = regVal - this->effectiveEntry + this->params.entryAddress;
+#endif
         regs[regName] = regVal;
         counter++;
     }
@@ -273,6 +281,7 @@ vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
     code.init(rt.environment());
     Assembler a(&code);
 
+#if __x86_64__
     //restore rax
     a.pop(rax);
     a.pop(rax);
@@ -629,6 +638,38 @@ vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
     a.pop(rax);
     a.ret();
 
+#else
+    //restore eax
+    a.pop(eax);
+    a.pop(eax);
+
+    //push registers
+    a.push(esp);
+    a.push(eax);
+    a.push(ebx);
+    a.push(ecx);
+    a.push(edx);
+    a.push(edi);
+    a.push(esi);
+    a.push(ebp);
+
+    //push eax
+    a.movabs(eax, 0);
+    a.push(eax);
+
+    //allocate space for pipe file name (./pipe_XXXXXXXX.hades0).
+    //start of allocated region is moved to ebx
+    a.mov(eax, 0x5a);
+    a.mov(ebx, 0);
+    a.mov(ecx, 0x16);
+    a.mov(edx, 7);
+    a.mov(esi, 0x22);
+    a.mov(edi, -1);
+    a.mov(ebp, 0);
+    a.syscall();
+    a.mov(ebx, eax);
+#endif
+
     vector<unsigned char> vec(a.bufferData(), a.bufferPtr());
     return vec;
 }
@@ -639,6 +680,7 @@ vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection(vector<unsigned
     code.init(rt.environment());
     Assembler a(&code);
 
+#ifdef __x86_64__
     a.mov(rax, 0x9);
     a.mov(rdi, 0x0);
     a.mov(rsi, 0x0);
@@ -647,11 +689,26 @@ vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection(vector<unsigned
     a.mov(r8, -0x1);
     a.mov(r9, 0x0);
     a.syscall();
+#else
+    a.mov(eax, 0x5a);
+    a.mov(ebx, 0x0);
+    a.mov(ecx, 0x0);
+    a.mov(edx, 0x7);
+    a.mov(esi, 0x22);
+    a.mov(edi, -0x1);
+    a.mov(ebp, 0x0);
+    a.syscall();
+#endif
 
     vector<unsigned char> vec(a.bufferData(), a.bufferPtr());
     vec.push_back(0x50);
+#ifdef __x86_64__
     unsigned char movArr[] = {0x48,0xc7,0x00};
     unsigned char addArr[] = {0x48,0x83,0xc0,0x04};
+#else
+    unsigned char movArr[] = {0xc7,0x00};
+    unsigned char addArr[] = {0x83,0xc0,0x04};
+#endif
     for(int i = 0; i < pipeModeAssemblyVec.size(); i+=4) {
         vec.insert(vec.end(), movArr, movArr + sizeof(movArr));
         for(int i2 = i; i2 < i + 4; i2++) {
@@ -938,9 +995,17 @@ void HadesDbg::run() {
         Logger::getLogger().log(LogLevel::SUCCESS, "Target reached entry breakpoint !");
         Logger::getLogger().log(LogLevel::INFO, "Injecting pipe mode in child process...");
         ptrace(PTRACE_GETREGS,this->pid,NULL,&regs);
+#if __x86_64__
         regs.rip--;
+#else
+        regs.eip--;
+#endif
         user_regs_struct savedRegs = regs;
+#if __x86_64__
         this->effectiveEntry = regs.rip;
+#else
+        this->effectiveEntry = regs.eip;
+#endif
         pwrite(this->memoryFd, this->replacedFileEntry, 1, (long)this->effectiveEntry);
         unsigned int injectPipeModeAssemblySize = this->injectPipeModeAssemblyVec.size();
         map<BigInt, BigInt> allocAddrFromBpAddr;
@@ -962,7 +1027,11 @@ void HadesDbg::run() {
             ptrace(PTRACE_CONT, pid, NULL, NULL);
             waitpid(this->pid, nullptr, 0);
             ptrace(PTRACE_GETREGS,this->pid,NULL,&regs);
+#if __x86_64__
             unsigned long long allocStart = regs.rax;
+#else
+            unsigned long long allocStart = regs.eax;
+#endif
             if(!allocStart) {
                 this->reportFatalError("Failure...");
                 close(this->memoryFd);
@@ -1008,12 +1077,21 @@ void HadesDbg::run() {
                         if(!inputToNumber("0x"+path.substr(path.length()-14, 8), sonPid)) {
                             this->reportError("Unable to read breakpoint PID !");
                         }
+#if __x86_64__
                         BigInt sonRip = this->readReg((int)sonPid, Register::RIP);
                         unsigned int bpIndex = this->params.bpIndexFromAddr[sonRip];
+#else
+                        BigInt sonEip = this->readReg((int)sonPid, Register::EIP);
+                        unsigned int bpIndex = this->params.bpIndexFromAddr[sonEip];
+#endif
                         stringstream breakpointHit;
                         breakpointHit << "Breakpoint \033[;37m" << +bpIndex << "\033[;36m hit !" << endl;
                         breakpointHit << "PID: \033[;37m" << hex << +sonPid << "\033[;36m" << endl;
+#if __x86_64__
                         breakpointHit << "Address: \033[;37m" << hex << +sonRip << "\033[;36m";
+#else
+                        breakpointHit << "Address: \033[;37m" << hex << +sonEip << "\033[;36m";
+#endif
                         Logger::getLogger().log(LogLevel::INFO, breakpointHit.str());
                         if(this->scriptByBreakpoint.count(bpIndex)) {
                             vector<string> commands = this->scriptByBreakpoint[bpIndex];
