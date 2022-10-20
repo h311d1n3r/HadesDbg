@@ -25,7 +25,7 @@ jobs:
       run: make test
     - name: run_tests_32
       run: |
-      	echo "Running 32bit tests"
+        echo "Running 32bit tests"
         for i in $(seq 1 1 `ls ./test/bin/x86 | wc -l`)
         do
           echo "Starting test n°$i"
@@ -43,7 +43,7 @@ jobs:
         rm -f *.hout
     - name: run_tests_64
       run: |
-      	echo "Running 64bit tests"
+        echo "Running 64bit tests"
         for i in $(seq 1 1 `ls ./test/bin/x64 | wc -l`)
         do
           echo "Starting test n°$i"
