@@ -28,7 +28,7 @@ bool HadesDbg::readBinaryHeader() {
             char* idField = (char*) malloc(0x20);
             binaryRead.read(idField, 0x20);
             if(idField[0] == 0x7f && idField[1] == 'E' && idField[2] == 'L' && idField[3] == 'F') {
-                if(idField[4] == 2) {
+                if(idField[4] == 1 || idField[4] == 2) {
                     if(idField[5] == 1) {
                         if(idField[7] == 0 || idField[7] == 3) {
                             this->replacedFileEntry = (unsigned char*) malloc(this->injectPipeModeAssemblyVec.size());
@@ -49,7 +49,7 @@ bool HadesDbg::readBinaryHeader() {
                             return true;
                         } else this->reportFatalError("The specified file can't be run on a Linux architecture.");
                     } else this->reportFatalError("HadesDbg currently handles little endian files only.");
-                } else this->reportFatalError("HadesDbg currently handles x64 files only.");
+                } else this->reportFatalError("The specified file has an unknown architecture !");
             } else this->reportFatalError("The specified binary is not a ELF file.");
         } else {
             stringstream error;
