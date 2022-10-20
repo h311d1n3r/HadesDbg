@@ -29,7 +29,7 @@ jobs:
         for i in $(seq 1 1 `ls ./test/bin/x86 | wc -l`)
         do
           echo "Starting test n°$i"
-          hadesdbg ./test/bin/x86/test_$i -config ./test/configs/x86/test_$i.hconf -script ./test/scripts/x86/test_$i.hscript -output ./test_$i.hout
+          hadesdbg32 ./test/bin/x86/test_$i -config ./test/configs/x86/test_$i.hconf -script ./test/scripts/x86/test_$i.hscript -output ./test_$i.hout
           if [[ $(md5sum ./test_$i.hout | cut -d' ' -f1) == $(md5sum ./test/results/x86/test_$i.hout | cut -d' ' -f1) ]]
           then
             echo "Success !"
@@ -47,7 +47,7 @@ jobs:
         for i in $(seq 1 1 `ls ./test/bin/x64 | wc -l`)
         do
           echo "Starting test n°$i"
-          hadesdbg ./test/bin/x64/test_$i -config ./test/configs/x64/test_$i.hconf -script ./test/scripts/x64/test_$i.hscript -output ./test_$i.hout
+          hadesdbg64 ./test/bin/x64/test_$i -config ./test/configs/x64/test_$i.hconf -script ./test/scripts/x64/test_$i.hscript -output ./test_$i.hout
           if [[ $(md5sum ./test_$i.hout | cut -d' ' -f1) == $(md5sum ./test/results/x64/test_$i.hout | cut -d' ' -f1) ]]
           then
             echo "Success !"
