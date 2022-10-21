@@ -9,6 +9,7 @@
 #include <main_types.h>
 #include <utils.h>
 #include <debugger.h>
+#include <config.h>
 
 using namespace std;
 
@@ -213,6 +214,7 @@ void prepareSigHandler() {
 
 int main(int argc, char* argv[]) {
     prepareSigHandler();
+    ConfigFileManager* configManager = ConfigFileManager::getInstance();
     if(argc > 1) {
         if(!strcmp(argv[1], "--help")) {
             printHelpMessage();

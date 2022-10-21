@@ -1,6 +1,8 @@
 #include <utils.h>
 #include <regex>
 #include <log.h>
+#include <unistd.h>
+#include <pwd.h>
 
 void split(const string &str, char c, vector<string> &elements) {
     stringstream strStream(str);
@@ -65,4 +67,12 @@ string removeConsoleChars(string consoleOut) {
         } else ret += currentChar;
     }
     return ret;
+}
+
+string findHomeDir() {
+    string homeDir;
+    if(!(homeDir = getenv("HOME")).length()) {
+        homeDir = getpwuid(getuid())->pw_dir;
+    }
+    return homeDir;
 }

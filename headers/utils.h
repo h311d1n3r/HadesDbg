@@ -14,5 +14,6 @@ bool endsWith(std::string const &value, std::string const &ending);
 string executeCommand(const char* cmd);
 BigInt invertEndian(BigInt val);
 string removeConsoleChars(string consoleOut);
+string findHomeDir();
 
 #endif
