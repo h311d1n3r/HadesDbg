@@ -11,8 +11,6 @@
 
 using namespace std;
 
-#define BigInt unsigned long long int
-
 class HadesDbg {
 private:
     BigInt fileEntry, effectiveEntry;

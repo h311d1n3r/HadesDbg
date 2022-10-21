@@ -28,12 +28,21 @@ bool HadesDbg::readBinaryHeader() {
             char* idField = (char*) malloc(0x20);
             binaryRead.read(idField, 0x20);
             if(idField[0] == 0x7f && idField[1] == 'E' && idField[2] == 'L' && idField[3] == 'F') {
-                if(idField[4] == 1 || idField[4] == 2) {
+#if __x86_64__
+                if(idField[4] == 2) {
+#else
+                if(idField[4] == 1) {
+#endif
                     if(idField[5] == 1) {
                         if(idField[7] == 0 || idField[7] == 3) {
                             this->replacedFileEntry = (unsigned char*) malloc(this->injectPipeModeAssemblyVec.size());
+#if __x86_64__
                             this->fileEntry = *((BigInt*)(idField + 0x18));
                             if(this->fileEntry >= 0x400000) this->fileEntry -= 0x400000;
+#else
+                            this->fileEntry = *((BigInt*)(idField + 0x18));
+                            if(this->fileEntry >= 0x8048000) this->fileEntry -= 0x8048000;
+#endif
                             binaryRead.seekg((long)this->fileEntry, fstream::beg);
                             binaryRead.read((char*)this->replacedFileEntry, (long)this->injectPipeModeAssemblyVec.size());
                             binaryRead.close();
@@ -49,7 +58,11 @@ bool HadesDbg::readBinaryHeader() {
                             return true;
                         } else this->reportFatalError("The specified file can't be run on a Linux architecture.");
                     } else this->reportFatalError("HadesDbg currently handles little endian files only.");
-                } else this->reportFatalError("The specified file has an unknown architecture !");
+#if __x86_64__
+                } else Logger::getLogger().log(LogLevel::FATAL, "This HadesDbg version handles 64bit files only.");
+#else
+                } else Logger::getLogger().log(LogLevel::FATAL, "This HadesDbg version handles 32bit files only.");
+#endif
             } else this->reportFatalError("The specified binary is not a ELF file.");
         } else {
             stringstream error;
@@ -137,16 +150,25 @@ string HadesDbg::prepareAction(pid_t pid, char* bytes, unsigned int bytesLen) {
 }
 
 BigInt HadesDbg::readReg(pid_t sonPid, Register reg) {
+#if __x86_64__
     const char readRegBytes[] = {
         Code::READ_REG,
         (char)(0x80 - reg), 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
     };
+    const unsigned int responseSize = 0xa;
+#else
+    const char readRegBytes[] = {
+        Code::READ_REG,
+        (char)(0x20 - reg), 0x0, 0x0, 0x0
+    };
+    const unsigned int responseSize = 6;
+#endif
     string filePath = this->prepareAction(sonPid, (char*)readRegBytes, sizeof(readRegBytes));
-    char* buffer = (char*) malloc(0xa);
+    char* buffer = (char*) malloc(responseSize);
     while(true) {
         ifstream fileReader;
         fileReader.open(filePath, ios::binary | ios::in);
-        fileReader.read(buffer, 0xa);
+        fileReader.read(buffer, responseSize);
         fileReader.close();
         if(buffer[0] == Code::TARGET_READY) break;
         this_thread::sleep_for(chrono::milliseconds(500));
@@ -163,17 +185,26 @@ BigInt HadesDbg::readReg(pid_t sonPid, Register reg) {
 }
 
 BigInt HadesDbg::readMem(pid_t sonPid, BigInt addr) {
+#if __x86_64__
     char readMemBytes[] = {
         Code::READ_MEM,
         0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
     };
+    const unsigned int responseSize = 0xa;
+#else
+    char readMemBytes[] = {
+        Code::READ_MEM,
+        0x0, 0x0, 0x0, 0x0
+    };
+    const unsigned int responseSize = 6;
+#endif
     memcpy(readMemBytes + 1, &addr, sizeof(addr));
     string filePath = this->prepareAction(sonPid, (char*)readMemBytes, sizeof(readMemBytes));
-    char* buffer = (char*) malloc(0xa);
+    char* buffer = (char*) malloc(responseSize);
     while(true) {
         ifstream fileReader;
         fileReader.open(filePath, ios::binary | ios::in);
-        fileReader.read(buffer, 0xa);
+        fileReader.read(buffer, responseSize);
         fileReader.close();
         if(buffer[0] == Code::TARGET_READY) break;
         this_thread::sleep_for(chrono::milliseconds(500));
@@ -185,18 +216,28 @@ BigInt HadesDbg::readMem(pid_t sonPid, BigInt addr) {
 }
 
 void HadesDbg::writeReg(pid_t sonPid, Register reg, BigInt val) {
+#if __x86_64__
     char writeRegBytes[] = {
         Code::WRITE_REG,
         (char)(0x80 - reg), 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
         0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
     };
     memcpy(writeRegBytes + 9, &val, sizeof(val));
+#else
+    char writeRegBytes[] = {
+        Code::WRITE_REG,
+        (char)(0x20 - reg), 0x0, 0x0, 0x0,
+        0x0, 0x0, 0x0, 0x0
+    };
+    memcpy(writeRegBytes + 5, &val, sizeof(val));
+#endif
+    const unsigned int responseSize = 1;
     string filePath = this->prepareAction(sonPid, (char*)writeRegBytes, sizeof(writeRegBytes));
-    char* buffer = (char*) malloc(0x1);
+    char* buffer = (char*) malloc(responseSize);
     while(true) {
         ifstream fileReader;
         fileReader.open(filePath, ios::binary | ios::in);
-        fileReader.read(buffer, 0x1);
+        fileReader.read(buffer, responseSize);
         fileReader.close();
         if(buffer[0] == Code::TARGET_READY) break;
         this_thread::sleep_for(chrono::milliseconds(500));
@@ -205,6 +246,7 @@ void HadesDbg::writeReg(pid_t sonPid, Register reg, BigInt val) {
 }
 
 void HadesDbg::writeMem(pid_t sonPid, BigInt addr, BigInt val) {
+#if __x86_64__
     char writeMemBytes[] = {
             Code::WRITE_MEM,
             0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
@@ -212,12 +254,22 @@ void HadesDbg::writeMem(pid_t sonPid, BigInt addr, BigInt val) {
     };
     memcpy(writeMemBytes + 1, &addr, sizeof(addr));
     memcpy(writeMemBytes + 9, &val, sizeof(val));
+#else
+    char writeMemBytes[] = {
+        Code::WRITE_MEM,
+        0x0, 0x0, 0x0, 0x0,
+        0x0, 0x0, 0x0, 0x0
+    };
+    memcpy(writeMemBytes + 1, &addr, sizeof(addr));
+    memcpy(writeMemBytes + 5, &val, sizeof(val));
+#endif
+    const unsigned int responseSize = 1;
     string filePath = this->prepareAction(sonPid, (char*)writeMemBytes, sizeof(writeMemBytes));
-    char* buffer = (char*) malloc(0x1);
+    char* buffer = (char*) malloc(responseSize);
     while(true) {
         ifstream fileReader;
         fileReader.open(filePath, ios::binary | ios::in);
-        fileReader.read(buffer, 0x1);
+        fileReader.read(buffer, responseSize);
         fileReader.close();
         if(buffer[0] == Code::TARGET_READY) break;
         this_thread::sleep_for(chrono::milliseconds(500));
@@ -227,14 +279,14 @@ void HadesDbg::writeMem(pid_t sonPid, BigInt addr, BigInt val) {
 
 map<string, BigInt> HadesDbg::readRegs(pid_t sonPid) {
     const char readRegsBytes[] = {
-            Code::READ_REGS,
+        Code::READ_REGS
     };
     string filePath = this->prepareAction(sonPid, (char*)readRegsBytes, sizeof(readRegsBytes));
-    char* buffer = (char*) malloc(0x2 + registerFromName.size() * 0x8);
+    char* buffer = (char*) malloc(0x2 + registerFromName.size() * sizeof(BigInt));
     while(true) {
         ifstream fileReader;
         fileReader.open(filePath, ios::binary | ios::in);
-        fileReader.read(buffer, 0x2 + registerFromName.size() * 0x8);
+        fileReader.read(buffer, 0x2 + registerFromName.size() * sizeof(BigInt));
         fileReader.close();
         if(buffer[0] == Code::TARGET_READY) break;
         this_thread::sleep_for(chrono::milliseconds(500));
@@ -412,7 +464,7 @@ vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
     a.mov(qword_ptr(rdx), 0);
     a.mov(rdi, rsi);
     a.mov(r8, rdi);
-    a.mov(rsi, 8);
+    a.add(rsi, 8);
     a.mov(rax, 0x23);
     a.syscall();
 
@@ -654,20 +706,333 @@ vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
     a.push(ebp);
 
     //push eax
-    a.movabs(eax, 0);
+    a.mov(eax, 0);
     a.push(eax);
 
     //allocate space for pipe file name (./pipe_XXXXXXXX.hades0).
     //start of allocated region is moved to ebx
-    a.mov(eax, 0x5a);
+    a.mov(eax, 0xc0);
     a.mov(ebx, 0);
     a.mov(ecx, 0x16);
     a.mov(edx, 7);
     a.mov(esi, 0x22);
     a.mov(edi, -1);
     a.mov(ebp, 0);
-    a.syscall();
+    a.int_(0x80);
     a.mov(ebx, eax);
+
+    //get pid
+    a.mov(eax, 0x14);
+    a.int_(0x80);
+
+    //write pipe file name in allocated region
+    //start of allocated region is in ebx
+    a.push(ebx);
+    a.mov(dword_ptr(ebx), 0x69702f2e);
+    a.add(ebx, 4);
+    a.mov(byte_ptr(ebx), 0x70);
+    a.inc(ebx);
+    a.mov(byte_ptr(ebx), 0x65);
+    a.inc(ebx);
+    a.mov(byte_ptr(ebx), 0x5f);
+    a.mov(edx, ebx);
+    a.add(ebx, 8);
+    asmjit::Label nameLoopLabel = a.newLabel();
+    a.bind(nameLoopLabel);
+    a.mov(ecx, eax);
+    a.and_(ecx, 0xf);
+    a.cmp(ecx, 9);
+    asmjit::Label letterLabel = a.newLabel();
+    asmjit::Label afterLetterLabel = a.newLabel();
+    a.ja(letterLabel);
+    a.add(ecx, 0x30);
+    a.jmp(afterLetterLabel);
+    a.bind(letterLabel);
+    a.add(ecx, 0x57);
+    a.bind(afterLetterLabel);
+    a.mov(byte_ptr(ebx), cl);
+    a.dec(ebx);
+    a.shr(eax, 4);
+    a.cmp(ebx, edx);
+    a.jne(nameLoopLabel);
+    a.add(ebx, 9);
+    a.mov(dword_ptr(ebx), 0x6461682e);
+    a.add(ebx, 4);
+    a.mov(byte_ptr(ebx), 0x65);
+    a.inc(ebx);
+    a.mov(byte_ptr(ebx), 0x73);
+    a.inc(ebx);
+    a.mov(byte_ptr(ebx), 0);
+    a.pop(ebx);
+
+    //open pipe file in create mode
+    //start of allocated region is pushed on the stack
+    //file descriptor is in eax
+    a.mov(eax, 5);
+    a.mov(ecx, 0x42);
+    a.mov(edx, 0x1ff);
+    a.int_(0x80);
+    a.push(ebx);
+
+    //allocate region for read and write operations
+    //file descriptor is moved to edi
+    //start of allocation is in eax
+    a.push(eax);
+    a.mov(eax, 0xc0);
+    a.mov(ebx, 0);
+    a.mov(ecx, 0xff);
+    a.mov(edx, 7);
+    a.mov(esi, 0x22);
+    a.mov(edi, -1);
+    a.mov(ebp, 0);
+    a.int_(0x80);
+    a.pop(edi);
+
+    //write target ready message to file
+    //start of allocation is moved to esi
+    a.mov(esi, eax);
+    a.mov(byte_ptr(eax), Code::TARGET_READY);
+    a.mov(eax, 4);
+    a.mov(ebx, edi);
+    a.mov(ecx, esi);
+    a.mov(edx, 1);
+    a.int_(0x80);
+
+    //close file
+    a.mov(eax, 6);
+    a.int_(0x80);
+
+    //wait for 1 second
+    //start of allocation is in esi
+    asmjit::Label timeLabel = a.newLabel();
+    a.bind(timeLabel);
+    a.mov(edx, esi);
+    a.mov(dword_ptr(edx), 1);
+    a.add(edx, 4);
+    a.mov(dword_ptr(edx), 0);
+    a.add(edx, 4);
+    a.mov(dword_ptr(edx), 0);
+    a.add(edx, 4);
+    a.mov(dword_ptr(edx), 0);
+    a.mov(ebx, esi);
+    a.mov(ecx, ebx);
+    a.add(ecx, 8);
+    a.mov(eax, 0xa2);
+    a.int_(0x80);
+
+    //open pipe file again
+    //if it fails, jump back to wait
+    a.pop(ebx);
+    a.push(ebx);
+    a.mov(eax, 5);
+    a.mov(ecx, 2);
+    a.mov(edx, 0x1ff);
+    a.int_(0x80);
+    a.mov(ecx, esi);
+    a.cmp(eax, 0);
+    a.js(timeLabel);
+
+    //read in allocated region
+    //if target ready message, jump back
+    //file descriptor is in edi
+    a.mov(ebx, eax);
+    a.mov(ecx, esi);
+    a.mov(edx, 0xff);
+    a.mov(eax, 3);
+    a.int_(0x80);
+    a.cmp(byte_ptr(esi), Code::TARGET_READY);
+    a.je(timeLabel);
+    a.mov(edi, ebx);
+
+    //read register
+    a.cmp(byte_ptr(esi), Code::READ_REG);
+    asmjit::Label readMemLabel = a.newLabel();
+    a.jne(readMemLabel);
+    a.add(esp, 4);
+    a.inc(esi);
+    a.add(esp, dword_ptr(esi));
+    a.pop(ecx);
+    a.sub(esp, dword_ptr(esi));
+    a.dec(esi);
+    a.sub(esp, 8);
+    a.mov(byte_ptr(esi), Code::TARGET_READY);
+    a.inc(esi);
+    a.mov(dword_ptr(esi), ecx);
+    a.add(esi, 4);
+    a.mov(byte_ptr(esi), 0);
+    a.sub(esi, 5);
+    a.mov(ebx, edi);
+    a.mov(ecx, 0);
+    a.mov(edx, 0);
+    a.mov(eax, 0x13);
+    a.int_(0x80);
+    a.mov(ecx, esi);
+    a.mov(edx, 6);
+    a.mov(eax, 4);
+    a.int_(0x80);
+
+    //read memory value
+    a.bind(readMemLabel);
+    a.cmp(byte_ptr(esi), Code::READ_MEM);
+    asmjit::Label writeRegLabel = a.newLabel();
+    a.jne(writeRegLabel);
+    a.inc(esi);
+    a.mov(ecx, dword_ptr(esi));
+    a.mov(ecx, dword_ptr(ecx));
+    a.dec(esi);
+    a.mov(byte_ptr(esi), Code::TARGET_READY);
+    a.inc(esi);
+    a.mov(dword_ptr(esi), ecx);
+    a.add(esi, 4);
+    a.mov(byte_ptr(esi), 0);
+    a.sub(esi, 5);
+    a.mov(ebx, edi);
+    a.mov(ecx, 0);
+    a.mov(edx, 0);
+    a.mov(eax, 0x13);
+    a.int_(0x80);
+    a.mov(ecx, esi);
+    a.mov(edx, 6);
+    a.mov(eax, 4);
+    a.int_(0x80);
+
+    //write register
+    a.bind(writeRegLabel);
+    a.cmp(byte_ptr(esi), Code::WRITE_REG);
+    asmjit::Label writeMemLabel = a.newLabel();
+    a.jne(writeMemLabel);
+    a.add(esp, 8);
+    a.inc(esi);
+    a.add(esp, dword_ptr(esi));
+    a.add(esi, 4);
+    a.push(dword_ptr(esi));
+    a.sub(esi, 4);
+    a.sub(esp, 4);
+    a.sub(esp, dword_ptr(esi));
+    a.dec(esi);
+    a.mov(byte_ptr(esi), Code::TARGET_READY);
+    a.inc(esi);
+    a.mov(byte_ptr(esi), 0);
+    a.dec(esi);
+    a.mov(ebx, edi);
+    a.mov(ecx, 0);
+    a.mov(edx, 0);
+    a.mov(eax, 0x13);
+    a.int_(0x80);
+    a.mov(ecx, esi);
+    a.mov(edx, 2);
+    a.mov(eax, 4);
+    a.int_(0x80);
+
+    //write memory
+    a.bind(writeMemLabel);
+    a.cmp(byte_ptr(esi), Code::WRITE_MEM);
+    asmjit::Label readRegsLabel = a.newLabel();
+    a.jne(readRegsLabel);
+    a.inc(esi);
+    a.mov(ecx, dword_ptr(esi));
+    a.add(esi, 4);
+    a.mov(edx, dword_ptr(esi));
+    a.sub(esi, 5);
+    a.mov(dword_ptr(ecx), edx);
+    a.mov(byte_ptr(esi), Code::TARGET_READY);
+    a.inc(esi);
+    a.mov(byte_ptr(esi), 0);
+    a.dec(esi);
+    a.mov(ebx, edi);
+    a.mov(ecx, 0);
+    a.mov(edx, 0);
+    a.mov(eax, 0x13);
+    a.int_(0x80);
+    a.mov(ecx, esi);
+    a.mov(edx, 2);
+    a.mov(eax, 4);
+    a.int_(0x80);
+
+    //read registers
+    a.bind(readRegsLabel);
+    a.cmp(byte_ptr(esi), Code::READ_REGS);
+    asmjit::Label closePipeLabel = a.newLabel();
+    a.jne(closePipeLabel);
+    a.mov(byte_ptr(esi), Code::TARGET_READY);
+    a.inc(esi);
+    a.add(esp, 4);
+    a.xor_(ebx, ebx);
+    asmjit::Label loopReadRegsLabel = a.newLabel();
+    a.bind(loopReadRegsLabel);
+    a.pop(ecx);
+    a.mov(qword_ptr(esi), ecx);
+    a.add(esi, 4);
+    a.inc(ebx);
+    a.cmp(ebx, registerFromName.size());
+    a.jb(loopReadRegsLabel);
+    a.mov(byte_ptr(esi), 0x0);
+    a.sub(esp, 0x4 + registerFromName.size() * 0x4);
+    a.sub(esi, 0x1 + registerFromName.size() * 0x4);
+    a.mov(ebx, edi);
+    a.mov(ecx, 0);
+    a.mov(edx, 0);
+    a.mov(eax, 0x13);
+    a.int_(0x80);
+    a.mov(ecx, esi);
+    a.mov(edx, 0x2 + registerFromName.size() * 4);
+    a.mov(eax, 4);
+    a.int_(0x80);
+
+    //close pipe file
+    a.bind(closePipeLabel);
+    a.mov(eax, 6);
+    a.mov(ebx, edi);
+    a.int_(0x80);
+
+    //check end_breakpoint
+    a.cmp(byte_ptr(esi), Code::END_BREAKPOINT);
+    a.jne(timeLabel);
+
+    //delete pipe file
+    //pipe file name is in rdi
+    a.pop(ebx);
+    a.mov(eax, 0xa);
+    a.int_(0x80);
+
+    //free read/write region
+    a.mov(eax, 0x5b);
+    a.mov(ebx, esi);
+    a.mov(ecx, 0xff);
+    a.int_(0x80);
+
+    //free pipe file name region
+    a.mov(eax, 0x5b);
+    a.mov(ecx, 0x16);
+    a.int_(0x80);
+
+    //prevent pop of eip
+    a.add(esp, 4);
+
+    //pop registers
+    a.pop(ebp);
+    a.pop(esi);
+    a.pop(edi);
+    a.pop(edx);
+    a.pop(ecx);
+    a.pop(ebx);
+    a.pop(eax);
+
+    //prevent pop of esp
+    a.add(esp, 4);
+
+    //replaced instructions
+    for(unsigned char i = 0; i < 64; i++) a.nop();
+
+    //return
+    a.sub(esp, 4);
+    a.push(eax);
+    a.add(esp, 8);
+    a.mov(eax, 0);
+    a.push(eax);
+    a.sub(esp, 4);
+    a.pop(eax);
+    a.ret();
 #endif
 
     vector<unsigned char> vec(a.bufferData(), a.bufferPtr());
@@ -680,7 +1045,7 @@ vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection(vector<unsigned
     code.init(rt.environment());
     Assembler a(&code);
 
-#ifdef __x86_64__
+#if __x86_64__
     a.mov(rax, 0x9);
     a.mov(rdi, 0x0);
     a.mov(rsi, 0x0);
@@ -690,19 +1055,18 @@ vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection(vector<unsigned
     a.mov(r9, 0x0);
     a.syscall();
 #else
-    a.mov(eax, 0x5a);
+    a.mov(eax, 0xc0);
     a.mov(ebx, 0x0);
     a.mov(ecx, 0x0);
     a.mov(edx, 0x7);
     a.mov(esi, 0x22);
     a.mov(edi, -0x1);
     a.mov(ebp, 0x0);
-    a.syscall();
+    a.int_(0x80);
 #endif
-
     vector<unsigned char> vec(a.bufferData(), a.bufferPtr());
     vec.push_back(0x50);
-#ifdef __x86_64__
+#if __x86_64__
     unsigned char movArr[] = {0x48,0xc7,0x00};
     unsigned char addArr[] = {0x48,0x83,0xc0,0x04};
 #else
@@ -769,7 +1133,7 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                             memValStr << hex << addr << ":";
                             Logger::getLogger().log(LogLevel::SUCCESS, memValStr.str());
                             stringstream output;
-                            for(int i = 0; i < len; i+=8) {
+                            for(int i = 0; i < len; i+=sizeof(BigInt)) {
                                 BigInt memValue = readMem(sonPid, entryRelative ? (addr + i - this->params.entryAddress + this->effectiveEntry) : addr + i);
                                 for(int i2 = 0; i2 < sizeof(memValue) && i+i2 < len; i2++) {
                                     if(!ascii) {
@@ -985,9 +1349,15 @@ void HadesDbg::run() {
         asmjit::CodeHolder code;
         code.init(rt.environment());
         Assembler a(&code);
+#if __x86_64__
         a.push(rax);
         a.movabs(rax, 0x0000000000000000);
         a.call(rax);
+#else
+        a.push(eax);
+        a.mov(eax, 0x00000000);
+        a.call(eax);
+#endif
         vector<unsigned char> breakpointCallVec(a.bufferData(), a.bufferPtr());
         unsigned char* breakpointCall(&breakpointCallVec[0]);
         unsigned int breakpointCallSize = breakpointCallVec.size();
@@ -1014,23 +1384,40 @@ void HadesDbg::run() {
         for(breakpoint = this->params.breakpoints.begin(); breakpoint != this->params.breakpoints.end(); breakpoint++) {
             BigInt breakpointAddr = breakpoint->first - this->params.entryAddress + this->effectiveEntry;
             unsigned char breakpointLength = breakpoint->second;
+#if __x86_64__
             pread(this->memoryFd, &this->pipeModeAssemblyVec[0] + pipeModeAssemblySize - 64 - 26, breakpointLength, (long)breakpointAddr);
             memcpy(&this->pipeModeAssemblyVec[0] + 0x1c, &breakpointAddr, sizeof(breakpointAddr));
+#else
+            pread(this->memoryFd, &this->pipeModeAssemblyVec[0] + pipeModeAssemblySize - 64 - 18, breakpointLength, (long)breakpointAddr);
+            memcpy(&this->pipeModeAssemblyVec[0] + 0xb, &breakpointAddr, sizeof(breakpointAddr));
+#endif
             BigInt returnAddr = breakpointAddr + breakpointLength;
+#if __x86_64__
             memcpy(&this->pipeModeAssemblyVec[0] + pipeModeAssemblySize - 0xf, &returnAddr, sizeof(returnAddr));
+#else
+            memcpy(&this->pipeModeAssemblyVec[0] + pipeModeAssemblySize - 0xa, &returnAddr, sizeof(returnAddr));
+#endif
             this->injectPipeModeAssemblyVec = preparePipeModeAssemblyInjection(this->pipeModeAssemblyVec);
             unsigned char *injectPipeModeAssembly = &(this->injectPipeModeAssemblyVec)[0];
+#if __x86_64__
             memcpy(injectPipeModeAssembly + 0x11, &pipeModeAssemblySize, sizeof(pipeModeAssemblySize));
+#else
+            memcpy(injectPipeModeAssembly + 0xb, &pipeModeAssemblySize, sizeof(pipeModeAssemblySize));
+#endif
             pwrite(this->memoryFd, injectPipeModeAssembly, injectPipeModeAssemblySize, (long)this->effectiveEntry);
+#if __x86_64__
             memset(&this->pipeModeAssemblyVec[0] + pipeModeAssemblySize - 64 - 26, 0x90, 64);
+#else
+            memset(&this->pipeModeAssemblyVec[0] + pipeModeAssemblySize - 64 - 18, 0x90, 64);
+#endif
             ptrace(PTRACE_SETREGS, this->pid, NULL, &savedRegs);
             ptrace(PTRACE_CONT, pid, NULL, NULL);
             waitpid(this->pid, nullptr, 0);
             ptrace(PTRACE_GETREGS,this->pid,NULL,&regs);
 #if __x86_64__
-            unsigned long long allocStart = regs.rax;
+            BigInt allocStart = regs.rax;
 #else
-            unsigned long long allocStart = regs.eax;
+            BigInt allocStart = regs.eax;
 #endif
             if(!allocStart) {
                 this->reportFatalError("Failure...");
@@ -1050,7 +1437,11 @@ void HadesDbg::run() {
             BigInt breakpointAddr = injectData->first;
             BigInt allocStart = injectData->second;
             unsigned char breakpointSize = this->params.breakpoints.at(breakpointAddr - this->effectiveEntry + this->params.entryAddress);
+#if __x86_64__
             memcpy(breakpointCall + 0x3, &allocStart, sizeof(allocStart));
+#else
+            memcpy(breakpointCall + 0x2, &allocStart, sizeof(allocStart));
+#endif
             pwrite(this->memoryFd, breakpointCall, breakpointCallSize, (long)breakpointAddr);
             unsigned char nopsAmount = breakpointSize - breakpointCallSize;
             char* nopsArr = (char*) malloc(nopsAmount);

@@ -8,12 +8,18 @@
 
 using namespace std;
 
+#if __x86_64__
+#define BigInt unsigned long long int
+#else
+#define BigInt unsigned int
+#endif
+
 struct BinaryParams {
     string binaryPath;
     vector<string> binaryArgs;
-    unsigned long long int entryAddress;
-    map<unsigned long long int, unsigned char> breakpoints;
-    map<unsigned long long int, unsigned int> bpIndexFromAddr;
+    BigInt entryAddress;
+    map<BigInt, unsigned char> breakpoints;
+    map<BigInt, unsigned int> bpIndexFromAddr;
     ifstream* scriptFile;
     ofstream* outputFile;
 };

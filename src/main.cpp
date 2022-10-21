@@ -67,7 +67,7 @@ bool addBreakpoint(string val) {
     }
     string addrPart = val.substr(0, delimiterIndex);
     string lenPart = val.substr(delimiterIndex + 1);
-    unsigned long long int addr = 0, lenBuf = 0;
+    BigInt addr = 0, lenBuf = 0;
     unsigned char len;
     if(!inputToNumber(addrPart, addr)) {
         stringstream msg;
@@ -86,12 +86,21 @@ bool addBreakpoint(string val) {
         msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is greater than 64 !";
         Logger::getLogger().log(LogLevel::FATAL, msg.str());
         return false;
+#if __x86_64__
     } else if(lenBuf < 12) {
         stringstream msg;
         msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is smaller than 12 !";
         Logger::getLogger().log(LogLevel::FATAL, msg.str());
         return false;
     }
+#else
+    } else if(lenBuf < 8) {
+        stringstream msg;
+        msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is smaller than 8 !";
+        Logger::getLogger().log(LogLevel::FATAL, msg.str());
+        return false;
+    }
+#endif
     len = lenBuf;
     params.breakpoints[addr] = len;
     params.bpIndexFromAddr[addr] = bpIndex;
@@ -112,7 +121,7 @@ bool analyseParam(const string& param, const string& val) {
             return false;
         }
         if(paramName == "entry") {
-            unsigned long long int entryAddress = 0;
+            BigInt entryAddress = 0;
             if(inputToNumber(val, entryAddress)) {
                 params.entryAddress = entryAddress;
             } else {
@@ -156,7 +165,6 @@ bool analyseParam(const string& param, const string& val) {
             if (configFile.is_open()) {
                 Logger::getLogger().log(LogLevel::SUCCESS, "Config file found ! Reading it...");
                 string line;
-                unsigned int bpIndex = 0;
                 while (getline(configFile, line)) {
                     if (!line.rfind("entry ", 0)) {
                         string entryAddr = line.substr(string("entry ").size());

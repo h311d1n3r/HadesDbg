@@ -10,7 +10,7 @@ void split(const string &str, char c, vector<string> &elements) {
     }
 }
 
-bool inputToNumber(string input, unsigned long long int& number) {
+bool inputToNumber(string input, BigInt& number) {
     size_t inputEnd = 0;
     int base = 10;
     if(input.find("0x") == 0) {
@@ -46,7 +46,7 @@ string executeCommand(const char* cmd) {
     return result;
 }
 
-unsigned long long int invertEndian(unsigned long long int val) {
+BigInt invertEndian(BigInt val) {
     unsigned long long int ret = 0;
     char* valArr = (char*)&val;
     char* retArr = (char*)&ret;
