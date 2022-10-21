@@ -15,7 +15,7 @@ To deal with this hard task, **HadesDbg** attaches to the target, **injects inst
 `hadesdbg32/hadesdbg64 binary [-param value] [--flag]`
 ### Parameters
 `entry` -> Specifies the program entry point. e.g: 'entry 0x401000'  
-`bp` -> Injects a breakpoint at the given address. **Notice that you must specify a size (at least 8 for 32bit and 14 for 64bit) that corresponds to an amount of bytes that can be replaced without cutting an instruction in two.** e.g: 'bp 0x401080:14'  
+`bp` -> Injects a breakpoint at the given address. **Notice that you must specify a size (at least 8 for 32bit and 12 for 64bit) that corresponds to an amount of bytes that can be replaced without cutting an instruction in two.** e.g: 'bp 0x401080:14'  
 `args` -> Specifies the arguments to be passed to the traced binary. e.g: 'args "./name.bin hello world"'  
 `script` -> Provides a script to automatically execute the debugger. e.g: 'script "./auto.hscript"'  
 `output` -> Redirects the formatted output of the tool into a file. e.g: 'output "./output.hout"'  
