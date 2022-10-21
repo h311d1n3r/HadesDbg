@@ -54,6 +54,7 @@ bin/lib:
 	@echo "Libraries successfully compiled !"
 
 compile: bin/lib
+	@echo "Compiling project..."
 	@mkdir -p $(HADESDBG_OUT)
 	@echo "Compiling 32bit version..."
 	@$(CC) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(LIB_INC) -o$(HADESDBG_OUT)/$(HADESDBG_32_NAME) $(COMPILE_FLAGS) $(COMPILE_32_FLAGS) -L"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_32_DIR)" -l$(ASMJIT_NAME) -Wl,-rpath,"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_32_DIR)"

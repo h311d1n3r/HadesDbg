@@ -1,6 +1,6 @@
 # HadesDbg
 ## Description
-### The Linux x64 last chance debugging tool.
+### The Linux x86/x86-64 last chance debugging tool.
 **HadesDbg** is the debugger you want to use if other dynamic tools fail to do the job.  
 For example, it should handle processes that **fork** into multiple sub-processes.
 ## How does it work ?
