@@ -74,6 +74,6 @@ string Logger::getLogColorStr(LogLevel level, bool bold) {
     LogColor color = LogColor::WHITE;
     if(colorsByLevels.count(level)) color = colorsByLevels[level];
     stringstream colorStream;
-    colorStream << "\033[" << (bold?"1":"0") << ";" << color << "m";
+    colorStream << "\033[" << (bold?"1":"0") << ";" << +color << "m";
     return colorStream.str();
 }
