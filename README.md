@@ -33,6 +33,11 @@ The following commands can be used when the target hits a breakpoint :
 `run` or `r` -> Resumes execution after a breakpoint was hit.  
 `info` or `i` -> Displays information concerning the debugging session.  
 `exit` or `e` -> Ends the debugging session.
+### Configuration file
+After running HadesDbg for the first time, a config file will be generated at `${HOME}/.hadesdbg/config.json`.  
+You can edit it in order to change the default behaviour of HadesDbg.  
+The following settings can be modified :  
+`open_delay_milli` -> How often (in milliseconds) the debugger checks for target messages in a pipe file.  
 ### Example
 #### Command
 The following command will execute the binary ./target given 0x12c0 as the entry, and inject a breakpoint at address 0x13f7.  

@@ -54,7 +54,7 @@ void printHelpMessage() {
     Logger::getLogger().log(LogLevel::INFO, paramsList.str(), false, false);
     Logger::getLogger().log(LogLevel::INFO, "Flags:", false, false);
     stringstream flagsList;
-    flagsList << "\033[1;33m   help\033[0;36m -> Displays this message." << endl;
+    flagsList << "\033[1;33m   help\033[0;36m -> Displays this message.";
     Logger::getLogger().log(LogLevel::INFO, flagsList.str(), false, false);
 }
 
@@ -214,7 +214,7 @@ void prepareSigHandler() {
 
 int main(int argc, char* argv[]) {
     prepareSigHandler();
-    ConfigFileManager* configManager = ConfigFileManager::getInstance();
+    ConfigFileManager::getInstance();
     if(argc > 1) {
         if(!strcmp(argv[1], "--help")) {
             printHelpMessage();

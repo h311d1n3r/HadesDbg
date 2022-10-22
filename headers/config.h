@@ -4,14 +4,19 @@
 #include <utils.h>
 
 struct Config {
-    long openDelayMilli = 0;
+    long openDelayMilli;
 };
 
 class ConfigFileManager {
 public:
     ConfigFileManager();
     static ConfigFileManager* getInstance();
+    Config* getConfig();
 private:
+    Config* readConfig();
+    void writeConfig(Config config);
+    bool configExists();
+    Config* config;
     static ConfigFileManager* instance;
 };
 
