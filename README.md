@@ -38,6 +38,7 @@ After running HadesDbg for the first time, a config file will be generated at `$
 You can edit it in order to change the default behaviour of HadesDbg.  
 The following settings can be modified :  
 `open_delay_milli` -> How often (in milliseconds) the debugger checks for target messages in a pipe file.  
+`theme` -> Theme to be used for printing in console. Values are `cetus`, `cerberus` and `basilisk`.  
 ### Example
 #### Command
 The following command will execute the binary ./target given 0x12c0 as the entry, and inject a breakpoint at address 0x13f7.  

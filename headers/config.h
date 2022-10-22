@@ -3,8 +3,15 @@
 
 #include <utils.h>
 
+enum Theme {
+    CETUS,
+    CERBERUS,
+    BASILISK
+};
+
 struct Config {
     long openDelayMilli;
+    Theme theme;
 };
 
 class ConfigFileManager {
@@ -15,6 +22,8 @@ public:
 private:
     Config* readConfig();
     void writeConfig(Config config);
+    Theme stringToTheme(string themeStr);
+    string themeToString(Theme theme);
     bool configExists();
     Config* config;
     static ConfigFileManager* instance;

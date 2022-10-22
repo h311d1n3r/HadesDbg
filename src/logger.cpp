@@ -5,6 +5,40 @@ using namespace std;
 
 Logger* Logger::instance;
 
+Logger::Logger() {
+    Config* config = ConfigFileManager::getInstance()->getConfig();
+    this->initTheme(config->theme);
+}
+
+void Logger::initTheme(Theme theme) {
+    switch(theme) {
+        case Theme::CETUS:
+            this->colorsByLevels[LogLevel::VARIABLE] = LogColor::WHITE;
+            this->colorsByLevels[LogLevel::SUCCESS] = LogColor::GREEN;
+            this->colorsByLevels[LogLevel::INFO] = LogColor::CYAN;
+            this->colorsByLevels[LogLevel::WARNING] = LogColor::YELLOW;
+            this->colorsByLevels[LogLevel::ERROR] = LogColor::MAGENTA;
+            this->colorsByLevels[LogLevel::FATAL] = LogColor::RED;
+            break;
+        case Theme::CERBERUS:
+            this->colorsByLevels[LogLevel::VARIABLE] = LogColor::WHITE;
+            this->colorsByLevels[LogLevel::SUCCESS] = LogColor::WHITE;
+            this->colorsByLevels[LogLevel::INFO] = LogColor::WHITE;
+            this->colorsByLevels[LogLevel::WARNING] = LogColor::WHITE;
+            this->colorsByLevels[LogLevel::ERROR] = LogColor::WHITE;
+            this->colorsByLevels[LogLevel::FATAL] = LogColor::WHITE;
+            break;
+        case Theme::BASILISK:
+            this->colorsByLevels[LogLevel::VARIABLE] = LogColor::RED;
+            this->colorsByLevels[LogLevel::SUCCESS] = LogColor::RED;
+            this->colorsByLevels[LogLevel::INFO] = LogColor::RED;
+            this->colorsByLevels[LogLevel::WARNING] = LogColor::RED;
+            this->colorsByLevels[LogLevel::ERROR] = LogColor::RED;
+            this->colorsByLevels[LogLevel::FATAL] = LogColor::RED;
+            break;
+    }
+}
+
 Logger Logger::getLogger() {
     if(!Logger::instance) {
         Logger::instance = new Logger();
@@ -14,24 +48,32 @@ Logger Logger::getLogger() {
 
 void Logger::log(LogLevel level, const string& message, bool bold, bool prefixSymbol) {
     stringstream prefix;
-    prefix << "\033[" << (bold?"1":"0") << ";";
+    prefix << "\033[" << (bold?"1":"0") << ";" << +colorsByLevels[level] << "m";
     switch(level) {
         case LogLevel::SUCCESS:
-            prefix << "32m" << (prefixSymbol ? "[+] " : "");
+            prefix << (prefixSymbol ? "[+] " : "");
             break;
         case LogLevel::INFO:
-            prefix << "36m" << (prefixSymbol ? "[*] " : "");
+            prefix << (prefixSymbol ? "[*] " : "");
             break;
         case LogLevel::WARNING:
-            prefix << "33m" << (prefixSymbol ? "[#] " : "");
+            prefix << (prefixSymbol ? "[#] " : "");
             break;
         case LogLevel::ERROR:
-            prefix << "35m" << (prefixSymbol ? "[?] " : "");
+            prefix << (prefixSymbol ? "[?] " : "");
             break;
         case LogLevel::FATAL:
-            prefix << "31m" << (prefixSymbol ? "[!] " : "");
+            prefix << (prefixSymbol ? "[!] " : "");
             break;
     }
     prefix << message << "\033[0m";
     cout << prefix.str() << endl;
+}
+
+string Logger::getLogColorStr(LogLevel level, bool bold) {
+    LogColor color = LogColor::WHITE;
+    if(colorsByLevels.count(level)) color = colorsByLevels[level];
+    stringstream colorStream;
+    colorStream << "\033[" << (bold?"1":"0") << ";" << color << "m";
+    return colorStream.str();
 }
