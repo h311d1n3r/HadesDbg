@@ -22,7 +22,7 @@ using namespace asmjit::x86;
 Config* config = ConfigFileManager::getInstance()->getConfig();
 const unsigned long long int hostOpenDelayMilli = config->openDelayMilli / 2;
 const unsigned long long int targetOpenDelaySeconds = config->openDelayMilli / 1000;
-const unsigned long long int targetOpenDelayNano = (config->openDelayMilli % 1000) * 1000;
+const unsigned long long int targetOpenDelayNano = (config->openDelayMilli % 1000) * 1000000;
 
 bool HadesDbg::readBinaryHeader() {
     ifstream binaryRead(this->params.binaryPath, fstream::binary);
@@ -118,7 +118,7 @@ void HadesDbg::handleExit() {
                 BigInt sonPid = 0;
                 if(inputToNumber(pidStr, sonPid)) {
                     stringstream killStr;
-                    killStr << "Killing son with PID: \033[;37m" << hex << +sonPid << "\033[;36m";
+                    killStr << "Killing son with PID: " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << +sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO);
                     Logger::getLogger().log(LogLevel::INFO, killStr.str());
                     kill((pid_t)sonPid, SIGKILL);
                 }
@@ -133,7 +133,7 @@ void HadesDbg::handleExit() {
             //Check if process with pid exists
             if(!kill((int)sonPid, 0)) {
                 stringstream killStr;
-                killStr << "Killing son with PID: \033[;37m" << hex << +sonPid << "\033[;36m";
+                killStr << "Killing son with PID: " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << +sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO);
                 Logger::getLogger().log(LogLevel::INFO, killStr.str());
                 kill((int)sonPid, SIGKILL);
             }
@@ -323,7 +323,7 @@ bool HadesDbg::endBp(pid_t sonPid) {
     string filePath = this->prepareAction(sonPid, (char*)endBpBytes, sizeof(endBpBytes));
     unsigned int counter = 0;
     unsigned int pause = hostOpenDelayMilli;
-    unsigned int timeout = 5 * 1000;
+    unsigned int timeout = 5 * (hostOpenDelayMilli * 2);
     int res = 0;
     while(stat(filePath.c_str(), &fileInfo) == 0 && baseTime >= time(&fileInfo.st_ctime)) {
         this_thread::sleep_for(chrono::milliseconds(pause));
@@ -813,13 +813,9 @@ vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
     asmjit::Label timeLabel = a.newLabel();
     a.bind(timeLabel);
     a.mov(edx, esi);
-    a.mov(dword_ptr(edx), targetOpenDelaySeconds);
+    a.mov(dword_ptr(edx), (long)targetOpenDelaySeconds);
     a.add(edx, 4);
-    a.mov(dword_ptr(edx), 0);
-    a.add(edx, 4);
-    a.mov(dword_ptr(edx), targetOpenDelayNano);
-    a.add(edx, 4);
-    a.mov(dword_ptr(edx), 0);
+    a.mov(dword_ptr(edx), (long)targetOpenDelayNano);
     a.mov(ebx, esi);
     a.mov(ecx, ebx);
     a.add(ecx, 8);
@@ -1103,18 +1099,18 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                 string regName = toUppercase(cmdParams[1]);
                 if (registerFromName.count(regName)) {
                     stringstream regAskStr;
-                    regAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m for \033[;37m" << regName << " \033[;36mvalue...";
+                    regAskStr << "Asking " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " for " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << regName << " " + Logger::getLogger().getLogColorStr(LogLevel::INFO) + "value...";
                     Register reg = registerFromName[regName];
                     Logger::getLogger().log(LogLevel::INFO, regAskStr.str());
                     BigInt regValue = readReg(sonPid, reg);
                     stringstream regValStr;
-                    regValStr << regName << ": \033[;37m" << hex << regValue << "\033[;32m";
+                    regValStr << regName << ": " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << regValue << Logger::getLogger().getLogColorStr(LogLevel::SUCCESS);
                     Logger::getLogger().log(LogLevel::SUCCESS, regValStr.str());
                     if(this->params.outputFile && this->params.outputFile->is_open()) {
                         *this->params.outputFile << removeConsoleChars(regValStr.str()) << endl;
                     }
-                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid register ! \033[;37mreadreg register\033[;33m");
-            } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mreadreg register\033[;33m");
+                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid register ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "readreg register" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
+            } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "readreg register" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
         }
         else if(cmdParams[0] == "readmem" || cmdParams[0] == "rm" || cmdParams[0] == "readmem_ascii" || cmdParams[0] == "rma") {
             if(cmdParams.size() > 2) {
@@ -1132,8 +1128,8 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                     if(inputToNumber(lenStr, len)) {
                         if(len > 0) {
                             stringstream memAskStr;
-                            memAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m for \033[;37m" << hex << len
-                                      << " \033[;36mbytes at address \033[;37m" << hex << addr << "\033[;36m...";
+                            memAskStr << "Asking " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " for " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << len
+                                      << " " + Logger::getLogger().getLogColorStr(LogLevel::INFO) + "bytes at address " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << addr << Logger::getLogger().getLogColorStr(LogLevel::INFO) + "...";
                             Logger::getLogger().log(LogLevel::INFO, memAskStr.str());
                             stringstream memValStr;
                             memValStr << hex << addr << ":";
@@ -1162,10 +1158,10 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                                 if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << endl;
                             }
                             Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
-                        } else Logger::getLogger().log(LogLevel::WARNING, "Length must be a strictly positive value ! \033[;37mreadmem address length\033[;33m");
-                    } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid length ! \033[;37mreadmem address length\033[;33m");
-                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid address ! \033[;37mreadmem address length\033[;33m");
-            } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mreadmem address length\033[;33m");
+                        } else Logger::getLogger().log(LogLevel::WARNING, "Length must be a strictly positive value ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "readmem address length" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
+                    } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid length ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "readmem address length" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
+                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid address ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "readmem address length" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
+            } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "readmem address length" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
         }
         else if(cmdParams[0] == "writereg" || cmdParams[0] == "wr") {
             if(cmdParams.size() > 2) {
@@ -1176,14 +1172,14 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                     BigInt val;
                     if(inputToNumber(valStr, val)) {
                         stringstream regEditStr;
-                        regEditStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m to set \033[;37m" << regName
-                                   << "\033[;36m to \033[;37m" << hex << val << "\033[;36m...";
+                        regEditStr << "Asking " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " to set " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << regName
+                                   << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " to " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << val << Logger::getLogger().getLogColorStr(LogLevel::INFO) + "...";
                         Logger::getLogger().log(LogLevel::INFO, regEditStr.str());
                         this->writeReg(sonPid, reg, val);
                         Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
-                    } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a number ! \033[;37mwritereg register value\033[;33m");
-                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid register ! \033[;37mwritereg register value\033[;33m");
-            } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mwritereg register value\033[;33m");
+                    } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a number ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "writereg register value" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
+                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid register ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "writereg register value" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
+            } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "writereg register value" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
         }
         else if(cmdParams[0] == "writemem" || cmdParams[0] == "wm") {
             if(cmdParams.size() > 2) {
@@ -1197,8 +1193,8 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                 if(inputToNumber(addrStr, addr)) {
                     string hexChain = cmdParams[2];
                     stringstream memEditStr;
-                    memEditStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m to write \033[;37m" << hexChain
-                               << "\033[;36m at \033[;37m" << hex << addr << "\033[;36m...";
+                    memEditStr << "Asking " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " to write " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hexChain
+                               << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " at " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << addr << Logger::getLogger().getLogColorStr(LogLevel::INFO) + "...";
                     Logger::getLogger().log(LogLevel::INFO, memEditStr.str());
                     for(int i = 0; i < hexChain.length(); i += 2 * sizeof(BigInt)) {
                         BigInt val = 0;
@@ -1211,21 +1207,21 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                                 val += (oldVal >> (substrLen * 8 / 2)) << (substrLen * 8 / 2);
                             }
                             this->writeMem(sonPid, entryRelative ? (addr + (i / 2) - this->params.entryAddress + this->effectiveEntry) : addr + (i / 2), val);
-                        } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid hexadecimal chain ! \033[;37mwritemem address hex_chain\033[;33m");
+                        } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid hexadecimal chain ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "writemem address hex_chain" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
                     }
                     Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
-                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid address ! \033[;37mwritemem address hex_chain\033[;33m");
-            } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! \033[;37mwritemem address hex_chain\033[;33m");
+                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid address ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "writemem address hex_chain" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
+            } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "writemem address hex_chain" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
         } else if(cmdParams[0] == "readregs" || cmdParams[0] == "rrs") {
             stringstream regsAskStr;
-            regsAskStr << "Asking \033[;37m" << hex << sonPid << "\033[;36m for \033[;37mall registers\033[;36m...";
+            regsAskStr << "Asking " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " for " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "all registers" + Logger::getLogger().getLogColorStr(LogLevel::INFO) + "...";
             Logger::getLogger().log(LogLevel::INFO, regsAskStr.str());
             map<string, BigInt> regs = readRegs(sonPid);
             Logger::getLogger().log(LogLevel::SUCCESS, "");
             stringstream regsStr;
             unsigned char counter = 0;
             for(string regName : orderedRegsNames) {
-                regsStr << regName << ":" << (regName.length() == 2 ? " " : "") << " \033[;37m" << setfill('0') << setw(2 * sizeof(BigInt)) << hex << regs[regName] << "\033[;32m";
+                regsStr << regName << ":" << (regName.length() == 2 ? " " : "") << " " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << setfill('0') << setw(2 * sizeof(BigInt)) << hex << regs[regName] << Logger::getLogger().getLogColorStr(LogLevel::SUCCESS);
                 if(counter < regs.size() - 1) {
                     if(((counter + 1) % 3) == 0) regsStr << endl;
                     else regsStr << "    ";
@@ -1241,19 +1237,19 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
             map<BigInt, unsigned char>::iterator breakpoint;
             unsigned char counter = 0;
             for(breakpoint = this->params.breakpoints.begin(); breakpoint != this->params.breakpoints.end(); breakpoint++) {
-                breakpointsStr << "\033[;37m0x" << hex << +breakpoint->first << "\033[;36m";
+                breakpointsStr << Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "0x" << hex << +breakpoint->first << Logger::getLogger().getLogColorStr(LogLevel::INFO);
                 if(counter < this->params.breakpoints.size() - 1) breakpointsStr << ", ";
                 counter++;
             }
             stringstream infoStr;
             infoStr << "Debug info:" << endl
-                    << "File: " << "\033[;37m" << this->params.binaryPath << "\033[;36m" << endl
-                    << "Process ID (original): " << "\033[;37m0x" << hex << +this->pid << "\033[;36m" << endl
-                    << "Process ID (current): " << "\033[;37m0x" << hex << +sonPid << "\033[;36m" << endl
-                    << "Entry point (ELF header): " << "\033[;37m0x" << hex << +this->fileEntry << "\033[;36m" << endl
-                    << "Entry point (effective): " << "\033[;37m0x" << hex << +this->effectiveEntry << "\033[;36m" << endl
-                    << "Entry point (defined): " << "\033[;37m0x" << hex << +this->params.entryAddress << "\033[;36m" << endl
-                    << "Effective offset: displayedAddress + " << "\033[;37m0x" << hex << +(this->effectiveEntry - this->params.entryAddress) << "\033[;36m" << endl
+                    << "File: " << Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << this->params.binaryPath << Logger::getLogger().getLogColorStr(LogLevel::INFO) << endl
+                    << "Process ID (original): " << Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "0x" << hex << +this->pid << Logger::getLogger().getLogColorStr(LogLevel::INFO) << endl
+                    << "Process ID (current): " << Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "0x" << hex << +sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) << endl
+                    << "Entry point (ELF header): " << Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "0x" << hex << +this->fileEntry << Logger::getLogger().getLogColorStr(LogLevel::INFO) << endl
+                    << "Entry point (effective): " << Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "0x" << hex << +this->effectiveEntry << Logger::getLogger().getLogColorStr(LogLevel::INFO) << endl
+                    << "Entry point (defined): " << Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "0x" << hex << +this->params.entryAddress << Logger::getLogger().getLogColorStr(LogLevel::INFO) << endl
+                    << "Effective offset: displayedAddress + " << Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "0x" << hex << +(this->effectiveEntry - this->params.entryAddress) << Logger::getLogger().getLogColorStr(LogLevel::INFO) << endl
                     << "Breakpoints: " << breakpointsStr.str();
             Logger::getLogger().log(LogLevel::INFO, infoStr.str());
         } else Logger::getLogger().log(LogLevel::WARNING, "Unknown command !");
@@ -1267,7 +1263,7 @@ bool HadesDbg::listenInput(pid_t sonPid) {
         if(input == "exit" || input == "e") return true;
         else if(input == "run" || input == "r") {
             stringstream runAskStr;
-            runAskStr << "Asking \033[;37m" << hex << +sonPid << "\033[;36m to resume execution...";
+            runAskStr << "Asking " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << +sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " to resume execution...";
             Logger::getLogger().log(LogLevel::INFO, runAskStr.str());
             if(this->endBp(sonPid)) Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
             else this->reportError("An error occured !");
@@ -1300,17 +1296,17 @@ bool HadesDbg::readScriptFile() {
             }
             if(!inputToNumber(line.substr(string("bp ").length()), currentBp)) {
                 stringstream msg;
-                msg << "Error line \033[;37m" << +lineNumber << "\033[;31m : Breakpoint index must be a number !";
+                msg << "Error line " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << +lineNumber << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " : Breakpoint index must be a number !";
                 this->reportFatalError(msg.str());
                 return false;
             } else if(currentBp <= 0) {
                 stringstream msg;
-                msg << "Error line \033[;37m" << +lineNumber << "\033[;31m : Breakpoint index must be >= 1 !";
+                msg << "Error line " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << +lineNumber << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " : Breakpoint index must be >= 1 !";
                 this->reportFatalError(msg.str());
                 return false;
             } else if(this->scriptByBreakpoint.count(currentBp)) {
                 stringstream msg;
-                msg << "Error line \033[;37m" << +lineNumber << "\033[;31m : Instructions have already been set for this breakpoint !";
+                msg << "Error line " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << +lineNumber << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " : Instructions have already been set for this breakpoint !";
                 this->reportFatalError(msg.str());
                 return false;
             }
@@ -1320,7 +1316,7 @@ bool HadesDbg::readScriptFile() {
             }
         } else {
             stringstream msg;
-            msg << "Error line \033[;37m" << +lineNumber << "\033[;31m : Breakpoint index was not set ! Use \"bp\" command before breakpoint instructions...";
+            msg << "Error line " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << +lineNumber << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " : Breakpoint index was not set ! Use \"bp\" command before breakpoint instructions...";
             this->reportFatalError(msg.str());
             return false;
         }
@@ -1437,7 +1433,7 @@ void HadesDbg::run() {
         pwrite(this->memoryFd, this->replacedFileEntry, injectPipeModeAssemblySize, (long)this->effectiveEntry);
         map<BigInt, BigInt>::iterator injectData;
         stringstream injectBpMsg;
-        injectBpMsg << "Injecting \033[;37m" << allocAddrFromBpAddr.size() << "\033[;36m breakpoint(s)...";
+        injectBpMsg << "Injecting " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << allocAddrFromBpAddr.size() << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " breakpoint(s)...";
         Logger::getLogger().log(LogLevel::INFO, injectBpMsg.str());
         for(injectData = allocAddrFromBpAddr.begin(); injectData != allocAddrFromBpAddr.end(); injectData++) {
             BigInt breakpointAddr = injectData->first;
@@ -1482,19 +1478,19 @@ void HadesDbg::run() {
                         unsigned int bpIndex = this->params.bpIndexFromAddr[sonEip];
 #endif
                         stringstream breakpointHit;
-                        breakpointHit << "Breakpoint \033[;37m" << +bpIndex << "\033[;36m hit !" << endl;
-                        breakpointHit << "PID: \033[;37m" << hex << +sonPid << "\033[;36m" << endl;
+                        breakpointHit << "Breakpoint " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << +bpIndex << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " hit !" << endl;
+                        breakpointHit << "PID: " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << +sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) << endl;
 #if __x86_64__
-                        breakpointHit << "Address: \033[;37m" << hex << +sonRip << "\033[;36m";
+                        breakpointHit << "Address: " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << +sonRip << Logger::getLogger().getLogColorStr(LogLevel::INFO);
 #else
-                        breakpointHit << "Address: \033[;37m" << hex << +sonEip << "\033[;36m";
+                        breakpointHit << "Address: " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << +sonEip << Logger::getLogger().getLogColorStr(LogLevel::INFO);
 #endif
                         Logger::getLogger().log(LogLevel::INFO, breakpointHit.str());
                         if(this->scriptByBreakpoint.count(bpIndex)) {
                             vector<string> commands = this->scriptByBreakpoint[bpIndex];
                             for(string command : commands) {
                                 stringstream commandMsg;
-                                commandMsg << "Script >> \033[;37m" << command << "\033[;36m";
+                                commandMsg << "Script >> " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << command << Logger::getLogger().getLogColorStr(LogLevel::INFO);
                                 Logger::getLogger().log(LogLevel::INFO, commandMsg.str());
                                 if(command == "exit" || command == "e") {
                                     stop = true;
@@ -1503,7 +1499,7 @@ void HadesDbg::run() {
                             }
                             if(!stop) {
                                 stringstream runAskStr;
-                                runAskStr << "Asking \033[;37m" << hex << +sonPid << "\033[;36m to resume execution...";
+                                runAskStr << "Asking " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << +sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " to resume execution...";
                                 Logger::getLogger().log(LogLevel::INFO, runAskStr.str());
                                 if(this->endBp(sonPid)) Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
                                 else this->reportError("An error occured !");

@@ -6,10 +6,7 @@
 #include <filesystem>
 #include <cstring>
 #include <vector>
-#include <main_types.h>
-#include <utils.h>
 #include <debugger.h>
-#include <config.h>
 
 using namespace std;
 
@@ -33,28 +30,28 @@ unsigned int bpIndex = 1;
 void printHelpMessage() {
     Logger::getLogger().log(LogLevel::INFO, TOOL_TITLE, false, false);
     stringstream version;
-    version << " Version: " << VERSION;
+    version << " Version: " << Logger::getLogger().getLogColorStr(LogLevel::VARIABLE, true) + VERSION;
     Logger::getLogger().log(LogLevel::INFO, version.str(), false, false);
     stringstream author;
-    author << " Author: " << AUTHOR;
+    author << " Author: " << Logger::getLogger().getLogColorStr(LogLevel::VARIABLE, true) + AUTHOR;
     Logger::getLogger().log(LogLevel::INFO, author.str(), false, false);
     stringstream arch;
-    arch << " Architecture: " << ARCHITECTURE;
+    arch << " Architecture: " << Logger::getLogger().getLogColorStr(LogLevel::VARIABLE, true) + ARCHITECTURE;
     Logger::getLogger().log(LogLevel::INFO, arch.str(), false, false);
     Logger::getLogger().log(LogLevel::INFO, "________________________________________\n", false, false);
-    Logger::getLogger().log(LogLevel::INFO, "Syntax: \033[1;33mhadesdbg binary [-param value] [--flag]\n", false, false);
+    Logger::getLogger().log(LogLevel::INFO, "Syntax: " + Logger::getLogger().getLogColorStr(LogLevel::WARNING, true) + "hadesdbg binary [-param value] [--flag]\n", false, false);
     Logger::getLogger().log(LogLevel::INFO, "Parameters:", false, false);
     stringstream paramsList;
-    paramsList << "\033[1;33m   entry\033[0;36m -> Specifies the program entry point. e.g: 'entry 0x401000'" << endl;
-    paramsList << "\033[1;33m   bp\033[0;36m -> Specifies a program breakpoint and the length of instructions to be replaced. e.g: 'bp 0x401000:20'" << endl;
-    paramsList << "\033[1;33m   args\033[0;36m -> Specifies the arguments to be passed to the traced binary. e.g: 'args \"./name.bin hello world\"'" << endl;
-    paramsList << "\033[1;33m   script\033[0;36m -> Provides a script to automatically execute the debugger. e.g: 'script \"./auto.hscript\"'" << endl;
-    paramsList << "\033[1;33m   output\033[0;36m -> Redirects the formatted output of the tool into a file. e.g: 'output \"./output.hout\"'" << endl;
-    paramsList << "\033[1;33m   config\033[0;36m -> Provides command parameters from a file. e.g: 'config \"./config.hconf\"'" << endl;
+    paramsList << Logger::getLogger().getLogColorStr(LogLevel::WARNING, true) + "   entry" + Logger::getLogger().getLogColorStr(LogLevel::INFO) + " -> Specifies the program entry point. e.g: 'entry 0x401000'" << endl;
+    paramsList << Logger::getLogger().getLogColorStr(LogLevel::WARNING, true) + "   bp" + Logger::getLogger().getLogColorStr(LogLevel::INFO) + " -> Specifies a program breakpoint and the length of instructions to be replaced. e.g: 'bp 0x401000:20'" << endl;
+    paramsList << Logger::getLogger().getLogColorStr(LogLevel::WARNING, true) + "   args" + Logger::getLogger().getLogColorStr(LogLevel::INFO) + " -> Specifies the arguments to be passed to the traced binary. e.g: 'args \"./name.bin hello world\"'" << endl;
+    paramsList << Logger::getLogger().getLogColorStr(LogLevel::WARNING, true) + "   script" + Logger::getLogger().getLogColorStr(LogLevel::INFO) + " -> Provides a script to automatically execute the debugger. e.g: 'script \"./auto.hscript\"'" << endl;
+    paramsList << Logger::getLogger().getLogColorStr(LogLevel::WARNING, true) + "   output" + Logger::getLogger().getLogColorStr(LogLevel::INFO) + " -> Redirects the formatted output of the tool into a file. e.g: 'output \"./output.hout\"'" << endl;
+    paramsList << Logger::getLogger().getLogColorStr(LogLevel::WARNING, true) + "   config" + Logger::getLogger().getLogColorStr(LogLevel::INFO) + " -> Provides command parameters from a file. e.g: 'config \"./config.hconf\"'" << endl;
     Logger::getLogger().log(LogLevel::INFO, paramsList.str(), false, false);
     Logger::getLogger().log(LogLevel::INFO, "Flags:", false, false);
     stringstream flagsList;
-    flagsList << "\033[1;33m   help\033[0;36m -> Displays this message.";
+    flagsList << Logger::getLogger().getLogColorStr(LogLevel::WARNING, true) + "   help" + Logger::getLogger().getLogColorStr(LogLevel::INFO) + " -> Displays this message.";
     Logger::getLogger().log(LogLevel::INFO, flagsList.str(), false, false);
 }
 
@@ -62,7 +59,7 @@ bool addBreakpoint(string val) {
     int delimiterIndex = (int)val.find(':');
     if(delimiterIndex == string::npos) {
         stringstream msg;
-        msg << "Breakpoints need to follow this format -> \033[;37maddress:length\033[;31m !";
+        msg << "Breakpoints need to follow this format -> " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "address:length" + Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " !";
         Logger::getLogger().log(LogLevel::FATAL, msg.str());
         return false;
     }
@@ -72,32 +69,32 @@ bool addBreakpoint(string val) {
     unsigned char len;
     if(!inputToNumber(addrPart, addr)) {
         stringstream msg;
-        msg << "Specified breakpoint address \033[;37m" << addrPart << "\033[;31m is not a number !";
+        msg << "Specified breakpoint address " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << addrPart << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " is not a number !";
         Logger::getLogger().log(LogLevel::FATAL, msg.str());
         return false;
     }
     if(!inputToNumber(lenPart, lenBuf)) {
         stringstream msg;
-        msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is not a number !";
+        msg << "Specified breakpoint length " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << lenPart << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " is not a number !";
         Logger::getLogger().log(LogLevel::FATAL, msg.str());
         return false;
     }
     if(lenBuf > 64) {
         stringstream msg;
-        msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is greater than 64 !";
+        msg << "Specified breakpoint length " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << lenPart << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " is greater than 64 !";
         Logger::getLogger().log(LogLevel::FATAL, msg.str());
         return false;
 #if __x86_64__
     } else if(lenBuf < 12) {
         stringstream msg;
-        msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is smaller than 12 !";
+        msg << "Specified breakpoint length " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << lenPart << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " is smaller than 12 !";
         Logger::getLogger().log(LogLevel::FATAL, msg.str());
         return false;
     }
 #else
     } else if(lenBuf < 8) {
         stringstream msg;
-        msg << "Specified breakpoint length \033[;37m" << lenPart << "\033[;31m is smaller than 8 !";
+        msg << "Specified breakpoint length " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << lenPart << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " is smaller than 8 !";
         Logger::getLogger().log(LogLevel::FATAL, msg.str());
         return false;
     }
@@ -117,7 +114,7 @@ bool analyseParam(const string& param, const string& val) {
         string paramName = param.substr(1);
         if(!val.length()) {
             stringstream msg;
-            msg << "Parameter \033[;37m" << paramName << "\033[;31m requires a value !";
+            msg << "Parameter " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << paramName << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " requires a value !";
             Logger::getLogger().log(LogLevel::FATAL, msg.str());
             return false;
         }
@@ -127,7 +124,7 @@ bool analyseParam(const string& param, const string& val) {
                 params.entryAddress = entryAddress;
             } else {
                 stringstream msg;
-                msg << "Specified entry address \033[;37m" << val << "\033[;31m is not a number !";
+                msg << "Specified entry address " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << val << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " is not a number !";
                 Logger::getLogger().log(LogLevel::FATAL, msg.str());
                 return false;
             }
@@ -145,7 +142,7 @@ bool analyseParam(const string& param, const string& val) {
                 Logger::getLogger().log(LogLevel::SUCCESS, "Script file found !");
             } else {
                 stringstream msg;
-                msg << "Couldn't open script file \033[;37m" << path << "\033[;31m !";
+                msg << "Couldn't open script file " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << path << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " !";
                 Logger::getLogger().log(LogLevel::FATAL, msg.str());
             }
         } else if(paramName == "output") {
@@ -156,7 +153,7 @@ bool analyseParam(const string& param, const string& val) {
                 Logger::getLogger().log(LogLevel::SUCCESS, "Output file found !");
             } else {
                 stringstream msg;
-                msg << "Couldn't open output file \033[;37m" << path << "\033[;31m !";
+                msg << "Couldn't open output file " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << path << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " !";
                 Logger::getLogger().log(LogLevel::FATAL, msg.str());
             }
         } else if(paramName == "config") {
@@ -171,7 +168,7 @@ bool analyseParam(const string& param, const string& val) {
                         string entryAddr = line.substr(string("entry ").size());
                         if(!inputToNumber(entryAddr, params.entryAddress)) {
                             stringstream msg;
-                            msg << "Entry \033[;37m" << entryAddr << "\033[;31m is not a valid integer !";
+                            msg << "Entry " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << entryAddr << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " is not a valid integer !";
                             Logger::getLogger().log(LogLevel::FATAL, msg.str());
                             return false;
                         }
@@ -182,7 +179,7 @@ bool analyseParam(const string& param, const string& val) {
                 }
             } else {
                 stringstream msg;
-                msg << "Couldn't open config file \033[;37m" << path << "\033[;31m !";
+                msg << "Couldn't open config file " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << path << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " !";
                 Logger::getLogger().log(LogLevel::FATAL, msg.str());
             }
         }
@@ -233,7 +230,7 @@ int main(int argc, char* argv[]) {
             dbg->run();
         } else {
             stringstream msg;
-            msg << "File \033[;37m" << binaryPath << "\033[;31m does not exist !";
+            msg << "File " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << binaryPath << Logger::getLogger().getLogColorStr(LogLevel::FATAL) + " does not exist !";
             Logger::getLogger().log(LogLevel::FATAL, msg.str());
         }
     } else {
