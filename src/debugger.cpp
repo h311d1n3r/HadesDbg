@@ -22,7 +22,7 @@ using namespace asmjit::x86;
 Config* config = ConfigFileManager::getInstance()->getConfig();
 const unsigned long long int hostOpenDelayMilli = config->openDelayMilli / 2;
 const unsigned long long int targetOpenDelaySeconds = config->openDelayMilli / 1000;
-const unsigned long long int targetOpenDelayNano = (config->openDelayMilli % 1000) * 1000;
+const unsigned long long int targetOpenDelayNano = (config->openDelayMilli % 1000) * 1000000;
 
 bool HadesDbg::readBinaryHeader() {
     ifstream binaryRead(this->params.binaryPath, fstream::binary);
@@ -323,7 +323,7 @@ bool HadesDbg::endBp(pid_t sonPid) {
     string filePath = this->prepareAction(sonPid, (char*)endBpBytes, sizeof(endBpBytes));
     unsigned int counter = 0;
     unsigned int pause = hostOpenDelayMilli;
-    unsigned int timeout = 5 * 1000;
+    unsigned int timeout = 5 * (hostOpenDelayMilli * 2);
     int res = 0;
     while(stat(filePath.c_str(), &fileInfo) == 0 && baseTime >= time(&fileInfo.st_ctime)) {
         this_thread::sleep_for(chrono::milliseconds(pause));
@@ -813,9 +813,9 @@ vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
     asmjit::Label timeLabel = a.newLabel();
     a.bind(timeLabel);
     a.mov(edx, esi);
-    a.mov(dword_ptr(edx), targetOpenDelaySeconds);
+    a.mov(dword_ptr(edx), (long)targetOpenDelaySeconds);
     a.add(edx, 4);
-    a.mov(dword_ptr(edx), targetOpenDelayNano);
+    a.mov(dword_ptr(edx), (long)targetOpenDelayNano);
     a.mov(ebx, esi);
     a.mov(ecx, ebx);
     a.add(ecx, 8);

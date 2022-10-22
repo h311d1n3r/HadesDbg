@@ -63,7 +63,7 @@ string removeConsoleChars(string consoleOut) {
     for(int i = 0; i < consoleOut.length(); i++) {
         char currentChar = consoleOut[i];
         if(currentChar == '\033') {
-            i += 5;
+            i += 6;
         } else ret += currentChar;
     }
     return ret;
