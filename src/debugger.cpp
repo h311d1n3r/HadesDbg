@@ -324,6 +324,7 @@ bool HadesDbg::endBp(pid_t sonPid) {
     unsigned int counter = 0;
     unsigned int pause = hostOpenDelayMilli;
     unsigned int timeout = 5 * (hostOpenDelayMilli * 2);
+    if(timeout < 1000) timeout = 1000;
     int res = 0;
     while(stat(filePath.c_str(), &fileInfo) == 0 && baseTime >= time(&fileInfo.st_ctime)) {
         this_thread::sleep_for(chrono::milliseconds(pause));
