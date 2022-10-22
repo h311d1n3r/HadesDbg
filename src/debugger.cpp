@@ -13,10 +13,16 @@
 #include <fcntl.h>
 #include <iostream>
 #include <asmjit/asmjit.h>
+#include <config.h>
 
 using Code = HadesDbg::DbgCode;
 using namespace std;
 using namespace asmjit::x86;
+
+Config* config = ConfigFileManager::getInstance()->getConfig();
+const unsigned long long int hostOpenDelayMilli = config->openDelayMilli / 2;
+const unsigned long long int targetOpenDelaySeconds = config->openDelayMilli / 1000;
+const unsigned long long int targetOpenDelayNano = (config->openDelayMilli % 1000) * 1000;
 
 bool HadesDbg::readBinaryHeader() {
     ifstream binaryRead(this->params.binaryPath, fstream::binary);
@@ -171,7 +177,7 @@ BigInt HadesDbg::readReg(pid_t sonPid, Register reg) {
         fileReader.read(buffer, responseSize);
         fileReader.close();
         if(buffer[0] == Code::TARGET_READY) break;
-        this_thread::sleep_for(chrono::milliseconds(500));
+        this_thread::sleep_for(chrono::milliseconds(hostOpenDelayMilli));
     }
     BigInt ret = 0;
     memcpy(&ret, buffer+0x1, sizeof(ret));
@@ -207,7 +213,7 @@ BigInt HadesDbg::readMem(pid_t sonPid, BigInt addr) {
         fileReader.read(buffer, responseSize);
         fileReader.close();
         if(buffer[0] == Code::TARGET_READY) break;
-        this_thread::sleep_for(chrono::milliseconds(500));
+        this_thread::sleep_for(chrono::milliseconds(hostOpenDelayMilli));
     }
     BigInt ret = 0;
     memcpy(&ret, buffer+0x1, sizeof(ret));
@@ -240,7 +246,7 @@ void HadesDbg::writeReg(pid_t sonPid, Register reg, BigInt val) {
         fileReader.read(buffer, responseSize);
         fileReader.close();
         if(buffer[0] == Code::TARGET_READY) break;
-        this_thread::sleep_for(chrono::milliseconds(500));
+        this_thread::sleep_for(chrono::milliseconds(hostOpenDelayMilli));
     }
     free(buffer);
 }
@@ -272,7 +278,7 @@ void HadesDbg::writeMem(pid_t sonPid, BigInt addr, BigInt val) {
         fileReader.read(buffer, responseSize);
         fileReader.close();
         if(buffer[0] == Code::TARGET_READY) break;
-        this_thread::sleep_for(chrono::milliseconds(500));
+        this_thread::sleep_for(chrono::milliseconds(hostOpenDelayMilli));
     }
     free(buffer);
 }
@@ -289,7 +295,7 @@ map<string, BigInt> HadesDbg::readRegs(pid_t sonPid) {
         fileReader.read(buffer, 0x2 + registerFromName.size() * sizeof(BigInt));
         fileReader.close();
         if(buffer[0] == Code::TARGET_READY) break;
-        this_thread::sleep_for(chrono::milliseconds(500));
+        this_thread::sleep_for(chrono::milliseconds(hostOpenDelayMilli));
     }
     map<string, BigInt> regs;
     unsigned char counter = 0;
@@ -316,7 +322,7 @@ bool HadesDbg::endBp(pid_t sonPid) {
     BigInt baseTime = time(&fileInfo.st_ctime);
     string filePath = this->prepareAction(sonPid, (char*)endBpBytes, sizeof(endBpBytes));
     unsigned int counter = 0;
-    unsigned int pause = 500;
+    unsigned int pause = hostOpenDelayMilli;
     unsigned int timeout = 5 * 1000;
     int res = 0;
     while(stat(filePath.c_str(), &fileInfo) == 0 && baseTime >= time(&fileInfo.st_ctime)) {
@@ -450,16 +456,16 @@ vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
     a.mov(rax, 3);
     a.syscall();
 
-    //wait for 1 second
+    //wait for time specified in config
     //start of allocation is put in r8
     asmjit::Label timeLabel = a.newLabel();
     a.bind(timeLabel);
     a.mov(rdx, rsi);
-    a.mov(qword_ptr(rdx), 1);
+    a.mov(qword_ptr(rdx), targetOpenDelaySeconds);
     a.add(rdx, 4);
     a.mov(qword_ptr(rdx), 0);
     a.add(rdx, 4);
-    a.mov(qword_ptr(rdx), 0);
+    a.mov(qword_ptr(rdx), targetOpenDelayNano);
     a.add(rdx, 4);
     a.mov(qword_ptr(rdx), 0);
     a.mov(rdi, rsi);
@@ -802,16 +808,16 @@ vector<unsigned char> HadesDbg::preparePipeModeAssembly() {
     a.mov(eax, 6);
     a.int_(0x80);
 
-    //wait for 1 second
+    //wait for time specified in config
     //start of allocation is in esi
     asmjit::Label timeLabel = a.newLabel();
     a.bind(timeLabel);
     a.mov(edx, esi);
-    a.mov(dword_ptr(edx), 1);
+    a.mov(dword_ptr(edx), targetOpenDelaySeconds);
     a.add(edx, 4);
     a.mov(dword_ptr(edx), 0);
     a.add(edx, 4);
-    a.mov(dword_ptr(edx), 0);
+    a.mov(dword_ptr(edx), targetOpenDelayNano);
     a.add(edx, 4);
     a.mov(dword_ptr(edx), 0);
     a.mov(ebx, esi);
@@ -1509,7 +1515,7 @@ void HadesDbg::run() {
                         if (stop) break;
                     }
                 }
-                this_thread::sleep_for(chrono::milliseconds(500));
+                this_thread::sleep_for(chrono::milliseconds(hostOpenDelayMilli));
             }
             Logger::getLogger().log(LogLevel::INFO, "Ending process...");
         } else this->reportFatalError("Failed to detach from child process...");

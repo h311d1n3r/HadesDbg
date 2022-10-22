@@ -14,11 +14,15 @@ HADESDBG_TEST_OUT_64=./test/bin/x64
 ASMJIT_NAME=asmjit
 ASMJIT_32_FLAGS=-DCMAKE_CXX_FLAGS=-m32 -DCMAKE_SHARED_LINKER_FLAGS=-m32
 ASMJIT_64_FLAGS=-DCMAKE_CXX_FLAGS=-m64 -DCMAKE_SHARED_LINKER_FLAGS=-m64
-ASMJIT_DIR=lib/asmjit
 ASMJIT_INC=lib/asmjit/src
 ASMJIT_OUT=lib/asmjit/bin
 
-LIB_INC=$(ASMJIT_INC)
+SIMPLESON_NAME=simpleson
+SIMPLESON_32_FLAGS=-DCMAKE_CXX_FLAGS=-m32 -DCMAKE_SHARED_LINKER_FLAGS=-m32
+SIMPLESON_64_FLAGS=-DCMAKE_CXX_FLAGS=-m64 -DCMAKE_SHARED_LINKER_FLAGS=-m64
+SIMPLESON_INC=lib/simpleson
+SIMPLESON_OUT=lib/simpleson/bin
+
 LIB_32_DIR=x86
 LIB_64_DIR=x64
 
@@ -51,16 +55,27 @@ bin/lib:
 	@cd $(ASMJIT_OUT) && sh -c 'cmake $(ASMJIT_64_FLAGS) .. $(SILENT_MODE)' $(QUIET_MODE) && make $(QUIET_MODE)
 	@mv $(ASMJIT_OUT)/libasmjit.so $(HADESDBG_OUT_LIB)/$(LIB_64_DIR)/
 	@rm -rf $(ASMJIT_OUT)
+	@echo "Compiling simpleson..."
+	@mkdir -p $(SIMPLESON_OUT)
+	@echo "Compiling 32bit version..."
+	@cd $(SIMPLESON_OUT) && sh -c 'cmake $(SIMPLESON_32_FLAGS) .. $(SILENT_MODE)' $(QUIET_MODE) && make $(QUIET_MODE)
+	@mv $(SIMPLESON_OUT)/libsimpleson.a $(HADESDBG_OUT_LIB)/$(LIB_32_DIR)/
+	@rm -rf $(SIMPLESON_OUT)
+	@mkdir -p $(SIMPLESON_OUT)
+	@echo "Compiling 64bit version..."
+	@cd $(SIMPLESON_OUT) && sh -c 'cmake $(SIMPLESON_64_FLAGS) .. $(SILENT_MODE)' $(QUIET_MODE) && make $(QUIET_MODE)
+	@mv $(SIMPLESON_OUT)/libsimpleson.a $(HADESDBG_OUT_LIB)/$(LIB_64_DIR)/
+	@rm -rf $(SIMPLESON_OUT)
 	@echo "Libraries successfully compiled !"
 
 compile: bin/lib
 	@echo "Compiling project..."
 	@mkdir -p $(HADESDBG_OUT)
 	@echo "Compiling 32bit version..."
-	@$(CC) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(LIB_INC) -o$(HADESDBG_OUT)/$(HADESDBG_32_NAME) $(COMPILE_FLAGS) $(COMPILE_32_FLAGS) -L"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_32_DIR)" -l$(ASMJIT_NAME) -Wl,-rpath,"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_32_DIR)"
+	@$(CC) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(ASMJIT_INC) -I$(SIMPLESON_INC) -o$(HADESDBG_OUT)/$(HADESDBG_32_NAME) $(COMPILE_FLAGS) $(COMPILE_32_FLAGS) -L"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_32_DIR)" -l$(ASMJIT_NAME) -l$(SIMPLESON_NAME) -Wl,-rpath,"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_32_DIR)"
 	@chmod 777 $(HADESDBG_OUT)/$(HADESDBG_32_NAME)
 	@echo "Compiling 64bit version..."
-	@$(CC) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(LIB_INC) -o$(HADESDBG_OUT)/$(HADESDBG_64_NAME) $(COMPILE_FLAGS) $(COMPILE_64_FLAGS) -L"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_64_DIR)" -l$(ASMJIT_NAME) -Wl,-rpath,"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_64_DIR)"
+	@$(CC) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(ASMJIT_INC) -I$(SIMPLESON_INC) -o$(HADESDBG_OUT)/$(HADESDBG_64_NAME) $(COMPILE_FLAGS) $(COMPILE_64_FLAGS) -L"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_64_DIR)" -l$(ASMJIT_NAME) -l$(SIMPLESON_NAME) -Wl,-rpath,"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_64_DIR)"
 	@chmod 777 $(HADESDBG_OUT)/$(HADESDBG_64_NAME)
 	@echo "Project successfully compiled !"
 
