@@ -21,19 +21,19 @@ void Logger::initTheme(Theme theme) {
             this->colorsByLevels[LogLevel::FATAL] = LogColor::RED;
             break;
         case Theme::CERBERUS:
-            this->colorsByLevels[LogLevel::VARIABLE] = LogColor::WHITE;
-            this->colorsByLevels[LogLevel::SUCCESS] = LogColor::WHITE;
-            this->colorsByLevels[LogLevel::INFO] = LogColor::WHITE;
-            this->colorsByLevels[LogLevel::WARNING] = LogColor::WHITE;
-            this->colorsByLevels[LogLevel::ERROR] = LogColor::WHITE;
-            this->colorsByLevels[LogLevel::FATAL] = LogColor::WHITE;
+            this->colorsByLevels[LogLevel::VARIABLE] = LogColor::RED;
+            this->colorsByLevels[LogLevel::SUCCESS] = LogColor::BRIGHT_YELLOW;
+            this->colorsByLevels[LogLevel::INFO] = LogColor::BRIGHT_RED;
+            this->colorsByLevels[LogLevel::WARNING] = LogColor::YELLOW;
+            this->colorsByLevels[LogLevel::ERROR] = LogColor::CYAN;
+            this->colorsByLevels[LogLevel::FATAL] = LogColor::BLUE;
             break;
         case Theme::BASILISK:
-            this->colorsByLevels[LogLevel::VARIABLE] = LogColor::RED;
-            this->colorsByLevels[LogLevel::SUCCESS] = LogColor::RED;
-            this->colorsByLevels[LogLevel::INFO] = LogColor::RED;
-            this->colorsByLevels[LogLevel::WARNING] = LogColor::RED;
-            this->colorsByLevels[LogLevel::ERROR] = LogColor::RED;
+            this->colorsByLevels[LogLevel::VARIABLE] = LogColor::GREEN;
+            this->colorsByLevels[LogLevel::SUCCESS] = LogColor::BRIGHT_YELLOW;
+            this->colorsByLevels[LogLevel::INFO] = LogColor::BRIGHT_GREEN;
+            this->colorsByLevels[LogLevel::WARNING] = LogColor::BLUE;
+            this->colorsByLevels[LogLevel::ERROR] = LogColor::BRIGHT_RED;
             this->colorsByLevels[LogLevel::FATAL] = LogColor::RED;
             break;
     }
