@@ -76,3 +76,13 @@ string findHomeDir() {
     }
     return homeDir;
 }
+
+string trim(string str) {
+    int index;
+    string output;
+    while((index = str.find_first_of(" ")) != string::npos) {
+        output += str.substr(0,index);
+        str = str.substr(index+1);
+    }
+    return output+str;
+}
