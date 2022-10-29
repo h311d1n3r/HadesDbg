@@ -14,6 +14,7 @@
 #include <iostream>
 #include <asmjit/asmjit.h>
 #include <config.h>
+#include <expr_interpreter.h>
 
 using Code = HadesDbg::DbgCode;
 using namespace std;
@@ -23,6 +24,8 @@ Config* config = ConfigFileManager::getInstance()->getConfig();
 const unsigned long long int hostOpenDelayMilli = config->openDelayMilli / 2;
 const unsigned long long int targetOpenDelaySeconds = config->openDelayMilli / 1000;
 const unsigned long long int targetOpenDelayNano = (config->openDelayMilli % 1000) * 1000000;
+
+ExprInterpreter* interpreter;
 
 bool HadesDbg::readBinaryHeader() {
     ifstream binaryRead(this->params.binaryPath, fstream::binary);
@@ -1105,7 +1108,7 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                     Logger::getLogger().log(LogLevel::INFO, regAskStr.str());
                     BigInt regValue = readReg(sonPid, reg);
                     stringstream regValStr;
-                    regValStr << regName << ": " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << regValue << Logger::getLogger().getLogColorStr(LogLevel::SUCCESS);
+                    regValStr << regName << ": " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << +regValue << Logger::getLogger().getLogColorStr(LogLevel::SUCCESS);
                     Logger::getLogger().log(LogLevel::SUCCESS, regValStr.str());
                     if(this->params.outputFile && this->params.outputFile->is_open()) {
                         *this->params.outputFile << removeConsoleChars(regValStr.str()) << endl;
@@ -1122,46 +1125,44 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                     entryRelative = true;
                     addrStr = addrStr.substr(1);
                 }
-                BigInt addr = 0;
-                if(inputToNumber(addrStr, addr)) {
-                    string lenStr = cmdParams[2];
-                    BigInt len = 0;
-                    if(inputToNumber(lenStr, len)) {
-                        if(len > 0) {
-                            stringstream memAskStr;
-                            memAskStr << "Asking " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " for " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << len
-                                      << " " + Logger::getLogger().getLogColorStr(LogLevel::INFO) + "bytes at address " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << addr << Logger::getLogger().getLogColorStr(LogLevel::INFO) + "...";
-                            Logger::getLogger().log(LogLevel::INFO, memAskStr.str());
-                            stringstream memValStr;
-                            memValStr << hex << addr << ":";
-                            Logger::getLogger().log(LogLevel::SUCCESS, memValStr.str());
-                            stringstream output;
-                            for(int i = 0; i < len; i+=sizeof(BigInt)) {
-                                BigInt memValue = readMem(sonPid, entryRelative ? (addr + i - this->params.entryAddress + this->effectiveEntry) : addr + i);
-                                for(int i2 = 0; i2 < sizeof(memValue) && i+i2 < len; i2++) {
-                                    if(!ascii) {
-                                        output << hex << setfill('0') << setw(2) << +(memValue >> (i2 * 8) & 0xff);
-                                        if(i2+1 < sizeof(memValue) && i+i2+1 < len) output << " ";
-                                    } else {
-                                        output << (char)(memValue >> (i2 * 8) & 0xff);
-                                    }
+                BigInt addr = interpreter->interpret(addrStr);
+                string lenStr = cmdParams[2];
+                BigInt len = 0;
+                if(inputToNumber(lenStr, len)) {
+                    if(len > 0) {
+                        stringstream memAskStr;
+                        memAskStr << "Asking " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " for " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << len
+                                  << " " + Logger::getLogger().getLogColorStr(LogLevel::INFO) + "bytes at address " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << addr << Logger::getLogger().getLogColorStr(LogLevel::INFO) + "...";
+                        Logger::getLogger().log(LogLevel::INFO, memAskStr.str());
+                        stringstream memValStr;
+                        memValStr << hex << addr << ":";
+                        Logger::getLogger().log(LogLevel::SUCCESS, memValStr.str());
+                        stringstream output;
+                        for(int i = 0; i < len; i+=sizeof(BigInt)) {
+                            BigInt memValue = readMem(sonPid, entryRelative ? (addr + i - this->params.entryAddress + this->effectiveEntry) : addr + i);
+                            for(int i2 = 0; i2 < sizeof(memValue) && i+i2 < len; i2++) {
+                                if(!ascii) {
+                                    output << hex << setfill('0') << setw(2) << +(memValue >> (i2 * 8) & 0xff);
+                                    if(i2+1 < sizeof(memValue) && i+i2+1 < len) output << " ";
+                                } else {
+                                    output << (char)(memValue >> (i2 * 8) & 0xff);
                                 }
-                                if(!ascii) cout << output.str() << endl;
-                                else cout << output.str();
-                                if(this->params.outputFile && this->params.outputFile->is_open()) {
-                                    if(!ascii) *this->params.outputFile << removeConsoleChars(output.str()) << endl;
-                                    else *this->params.outputFile << removeConsoleChars(output.str());
-                                }
-                                output.str("");
                             }
-                            if(ascii) {
-                                cout << endl;
-                                if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << endl;
+                            if(!ascii) cout << output.str() << endl;
+                            else cout << output.str();
+                            if(this->params.outputFile && this->params.outputFile->is_open()) {
+                                if(!ascii) *this->params.outputFile << removeConsoleChars(output.str()) << endl;
+                                else *this->params.outputFile << removeConsoleChars(output.str());
                             }
-                            Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
-                        } else Logger::getLogger().log(LogLevel::WARNING, "Length must be a strictly positive value ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "readmem address length" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
-                    } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid length ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "readmem address length" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
-                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid address ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "readmem address length" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
+                            output.str("");
+                        }
+                        if(ascii) {
+                            cout << endl;
+                            if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << endl;
+                        }
+                        Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
+                    } else Logger::getLogger().log(LogLevel::WARNING, "Length must be a strictly positive value ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "readmem address length" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
+                } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid length ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "readmem address length" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
             } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "readmem address length" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
         }
         else if(cmdParams[0] == "writereg" || cmdParams[0] == "wr") {
@@ -1190,28 +1191,29 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
                     entryRelative = true;
                     addrStr = addrStr.substr(1);
                 }
-                BigInt addr;
-                if(inputToNumber(addrStr, addr)) {
-                    string hexChain = cmdParams[2];
-                    stringstream memEditStr;
-                    memEditStr << "Asking " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " to write " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hexChain
-                               << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " at " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << addr << Logger::getLogger().getLogColorStr(LogLevel::INFO) + "...";
-                    Logger::getLogger().log(LogLevel::INFO, memEditStr.str());
-                    for(int i = 0; i < hexChain.length(); i += 2 * sizeof(BigInt)) {
-                        BigInt val = 0;
-                        unsigned long substrLen = i + 2 * sizeof(BigInt) > hexChain.length() ? hexChain.length() - i : 2 * sizeof(BigInt);
-                        if(inputToNumber("0x"+hexChain.substr(i, substrLen), val)) {
-                            val = invertEndian(val);
-                            if(substrLen < 2 * sizeof(BigInt)) {
-                                BigInt oldVal = readMem(sonPid, entryRelative ? (addr + (i / 2) - this->params.entryAddress + this->effectiveEntry) : addr + (i / 2));
-                                val >>= sizeof(BigInt) * 8 - (substrLen * 8 / 2);
-                                val += (oldVal >> (substrLen * 8 / 2)) << (substrLen * 8 / 2);
-                            }
-                            this->writeMem(sonPid, entryRelative ? (addr + (i / 2) - this->params.entryAddress + this->effectiveEntry) : addr + (i / 2), val);
-                        } else Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid hexadecimal chain ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "writemem address hex_chain" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
+                BigInt addr = interpreter->interpret(addrStr);
+                string hexChain = cmdParams[2];
+                stringstream memEditStr;
+                memEditStr << "Asking " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " to write " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hexChain
+                           << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " at " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << addr << Logger::getLogger().getLogColorStr(LogLevel::INFO) + "...";
+                Logger::getLogger().log(LogLevel::INFO, memEditStr.str());
+                for(int i = 0; i < hexChain.length(); i += 2 * sizeof(BigInt)) {
+                    BigInt val = 0;
+                    unsigned long substrLen = i + 2 * sizeof(BigInt) > hexChain.length() ? hexChain.length() - i : 2 * sizeof(BigInt);
+                    if(inputToNumber("0x"+hexChain.substr(i, substrLen), val)) {
+                        val = invertEndian(val);
+                        if(substrLen < 2 * sizeof(BigInt)) {
+                            BigInt oldVal = readMem(sonPid, entryRelative ? (addr + (i / 2) - this->params.entryAddress + this->effectiveEntry) : addr + (i / 2));
+                            val >>= sizeof(BigInt) * 8 - (substrLen * 8 / 2);
+                            val += (oldVal >> (substrLen * 8 / 2)) << (substrLen * 8 / 2);
+                        }
+                        this->writeMem(sonPid, entryRelative ? (addr + (i / 2) - this->params.entryAddress + this->effectiveEntry) : addr + (i / 2), val);
+                    } else {
+                        Logger::getLogger().log(LogLevel::WARNING, "Second parameter must be a valid hexadecimal chain ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "writemem address hex_chain" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
+                        return;
                     }
-                    Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
-                } else Logger::getLogger().log(LogLevel::WARNING, "First parameter must be a valid address ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "writemem address hex_chain" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
+                }
+                Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
             } else Logger::getLogger().log(LogLevel::WARNING, "This command requires more parameters ! " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) + "writemem address hex_chain" + Logger::getLogger().getLogColorStr(LogLevel::WARNING));
         } else if(cmdParams[0] == "readregs" || cmdParams[0] == "rrs") {
             stringstream regsAskStr;
@@ -1459,6 +1461,7 @@ void HadesDbg::run() {
             }
         }
         Logger::getLogger().log(LogLevel::SUCCESS, "Done !");
+        interpreter = new ExprInterpreter(this->pid, this, this->effectiveEntry - this->params.entryAddress);
         if(!ptrace(PTRACE_DETACH,this->pid,NULL,NULL)) {
             Logger::getLogger().log(LogLevel::SUCCESS, "Successfully detached from child process !");
             Logger::getLogger().log(LogLevel::INFO, "Entering pipe mode.");

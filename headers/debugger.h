@@ -28,10 +28,6 @@ private:
     static vector<unsigned char> preparePipeModeAssemblyInjection(vector<unsigned char> pipeModeAssemblyVec);
     static vector<unsigned char> preparePipeModeAssembly();
     static string prepareAction(pid_t pid, char* bytes, unsigned int bytesLen);
-    BigInt readReg(pid_t sonPid, Register reg);
-    BigInt readMem(pid_t sonPid, BigInt addr);
-    void writeReg(pid_t sonPid, Register reg, BigInt val);
-    void writeMem(pid_t sonPid, BigInt addr, BigInt val);
     map<string, BigInt> readRegs(pid_t sonPid);
     bool endBp(pid_t sonPid);
     void execCommand(pid_t sonPid, string input);
@@ -60,6 +56,10 @@ public:
     };
     void run();
     void handleExit();
+    BigInt readReg(pid_t sonPid, Register reg);
+    BigInt readMem(pid_t sonPid, BigInt addr);
+    void writeReg(pid_t sonPid, Register reg, BigInt val);
+    void writeMem(pid_t sonPid, BigInt addr, BigInt val);
 };
 
 #endif

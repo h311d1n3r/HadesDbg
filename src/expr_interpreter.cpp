@@ -1,14 +1,14 @@
 #include <expr_interpreter.h>
 #include <utils.h>
-#include <iomanip>
 
 BigInt ExprInterpreter::interpret(std::string mem) {
     mem = trim(mem);
+    if(!mem.length()) return 0;
     if(!mem.find_first_of("[")) {
         int lastIndex = mem.find_last_of("]");
         string pointerStr = mem.substr(1, lastIndex-1);
         BigInt addr = this->interpret(pointerStr);
-        return this->readMem(pid, addr);
+        return this->debugger->readMem(pid, addr) + this->interpret(mem.substr(lastIndex+1));
     } else {
         string skipped = "";
         while (mem.length() > 0) {
@@ -48,14 +48,18 @@ BigInt ExprInterpreter::interpret(std::string mem) {
                 relativeToEntry = true;
                 skipped = skipped.substr(1);
             }
+            if (!inputToNumber(skipped, val)) {
+                Register reg = registerFromName[toUppercase(skipped)];
+                val = this->debugger->readReg(this->pid, reg);
 #if __x86_64__
-            if(!inputToNumber(skipped, val)) val = parseRegValue(this->pid, registerFromName[skipped]);
+                if(reg == Register::RIP) val += this->entryOff;
 #else
-            if (!inputToNumber(skipped, val)) val = this->readReg(this->pid, registerFromName[skipped]);
+                if(reg == Register::EIP) val += this->entryOff;
 #endif
+            }
             if (relativeToEntry) val = val + this->entryOff;
             return val;
         }
     }
-    return -1;
+    return 0;
 }

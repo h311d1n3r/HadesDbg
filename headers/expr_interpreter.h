@@ -4,20 +4,17 @@
 #include <string>
 #include <main_types.h>
 #include <regs.h>
+#include <debugger.h>
 
 using namespace std;
-
-typedef BigInt (*ReadMemFunc)(pid_t sonPid, BigInt addr);
-typedef BigInt (*ReadRegFunc)(pid_t sonPid, Register reg);
 
 class ExprInterpreter {
 private:
     pid_t pid;
-    ReadMemFunc readMem;
-    ReadRegFunc readReg;
+    HadesDbg* debugger;
     BigInt entryOff;
 public:
-    ExprInterpreter(pid_t pid, ReadMemFunc readMem, ReadRegFunc readReg, BigInt entryOff) : pid(pid), readMem(readMem), readReg(readReg), entryOff(entryOff) {};
+    ExprInterpreter(pid_t pid, HadesDbg* debugger, BigInt entryOff) : pid(pid), debugger(debugger), entryOff(entryOff) {};
     BigInt interpret(string mem);
 };
 
