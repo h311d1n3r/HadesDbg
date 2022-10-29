@@ -23,6 +23,9 @@ To deal with this hard task, **HadesDbg** attaches to the target, **injects inst
 2. Clone the repository.  
 3. Compile the tool with `make`.  
 4. Add the generated `bin` directory to your path using `PATH=$PATH:~/path/to/the/repo/bin`.  
+
+<a name="how"/>
+
 ## How to use ?
 
 <a name="how_syntax"/>
