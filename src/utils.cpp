@@ -81,7 +81,7 @@ string findHomeDir() {
 }
 
 string trim(string str) {
-    unsigned int index;
+    BigInt index;
     string output;
     while((index = str.find_first_of(' ')) != string::npos) {
         output += str.substr(0,index);
