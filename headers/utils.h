@@ -15,5 +15,6 @@ string executeCommand(const char* cmd);
 BigInt invertEndian(BigInt val);
 string removeConsoleChars(string consoleOut);
 string findHomeDir();
+string trim(string);
 
 #endif
