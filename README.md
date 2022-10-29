@@ -6,25 +6,11 @@ For example, it should handle processes that **fork** into multiple sub-processe
 ## How does it work ?
 The goal was to create a debugger that wouldn't alter the process **normal execution**.  
 To deal with this hard task, **HadesDbg** attaches to the target, **injects instructions to communicate by the way of a pipe file**, and then detaches from the target.
-## Table of contents
-[Build the tool](#build)  
-[How to use ?](#how)  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Syntax](#how_syntax)  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Parameters](#how_params)  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Flags](#how_flags)  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Configuration file](#how_config)  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Example](#how_example)  
-[Warning](#warning)  
-
-<a name="build"/>
-
-## Build the tool
-1. Clone the repository.
-2. Compile the tool with `make`.
-3. Add the generated `bin` directory to your path using `PATH=$PATH:~/path/to/the/repo/bin`.  
-
-<a name="how"/>
-
+## Build the tool  
+1. You need to have cmake and g++-multilib installed on your system.  
+2. Clone the repository.  
+3. Compile the tool with `make`.  
+4. Add the generated `bin` directory to your path using `PATH=$PATH:~/path/to/the/repo/bin`.  
 ## How to use ?
 
 <a name="how_syntax"/>
