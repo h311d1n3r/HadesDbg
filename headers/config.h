@@ -20,11 +20,11 @@ public:
     static ConfigFileManager* getInstance();
     Config* getConfig();
 private:
-    Config* readConfig();
+    static Config* readConfig();
     void writeConfig(Config config);
-    Theme stringToTheme(string themeStr);
+    static Theme stringToTheme(const string& themeStr);
     string themeToString(Theme theme);
-    bool configExists();
+    static bool configExists();
     Config* config;
     static ConfigFileManager* instance;
 };

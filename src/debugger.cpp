@@ -7,15 +7,15 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <filesystem>
-#include <utils.h>
 #include <sys/ptrace.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <iostream>
 #include <asmjit/asmjit.h>
-#include <config.h>
 #include <expr_interpreter.h>
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCDFAInspection"
 using Code = HadesDbg::DbgCode;
 using namespace std;
 using namespace asmjit::x86;
@@ -31,7 +31,7 @@ bool HadesDbg::readBinaryHeader() {
     ifstream binaryRead(this->params.binaryPath, fstream::binary);
     if(binaryRead) {
         binaryRead.seekg(0, fstream::end);
-        long len = binaryRead.tellg();
+        long long len = binaryRead.tellg();
         binaryRead.seekg(0, fstream::beg);
         if(len >= 0x20) {
             char* idField = (char*) malloc(0x20);
@@ -153,7 +153,7 @@ string HadesDbg::prepareAction(pid_t pid, char* bytes, unsigned int bytesLen) {
     filePath << ".hades";
     ofstream fileWriter;
     fileWriter.open(filePath.str(), ios::binary | ios::out);
-    fileWriter.write(bytes, bytesLen);
+    fileWriter.write(bytes, (int)bytesLen);
     fileWriter.close();
     return filePath.str();
 }
@@ -295,14 +295,14 @@ map<string, BigInt> HadesDbg::readRegs(pid_t sonPid) {
     while(true) {
         ifstream fileReader;
         fileReader.open(filePath, ios::binary | ios::in);
-        fileReader.read(buffer, 0x2 + registerFromName.size() * sizeof(BigInt));
+        fileReader.read(buffer, (int)(0x2 + registerFromName.size() * sizeof(BigInt)));
         fileReader.close();
         if(buffer[0] == Code::TARGET_READY) break;
         this_thread::sleep_for(chrono::milliseconds(hostOpenDelayMilli));
     }
     map<string, BigInt> regs;
     unsigned char counter = 0;
-    for(string regName : orderedRegsNames) {
+    for(const string& regName : orderedRegsNames) {
         BigInt regVal = 0;
         memcpy(&regVal, buffer + 0x1 + (registerFromName.size() - counter - 1) * sizeof(regVal), sizeof(regVal));
 #if __x86_64__
@@ -321,7 +321,7 @@ bool HadesDbg::endBp(pid_t sonPid) {
     const char endBpBytes[] = {
         Code::END_BREAKPOINT,
     };
-    struct stat fileInfo;
+    struct stat fileInfo{};
     BigInt baseTime = time(&fileInfo.st_ctime);
     string filePath = this->prepareAction(sonPid, (char*)endBpBytes, sizeof(endBpBytes));
     unsigned int counter = 0;
@@ -1094,7 +1094,7 @@ vector<unsigned char> HadesDbg::preparePipeModeAssemblyInjection(vector<unsigned
     return vec;
 }
 
-void HadesDbg::execCommand(pid_t sonPid, string input) {
+void HadesDbg::execCommand(pid_t sonPid, const string& input) {
     vector<string> cmdParams;
     split(input, ' ', cmdParams);
     if(!cmdParams.empty()) {
@@ -1223,7 +1223,7 @@ void HadesDbg::execCommand(pid_t sonPid, string input) {
             Logger::getLogger().log(LogLevel::SUCCESS, "");
             stringstream regsStr;
             unsigned char counter = 0;
-            for(string regName : orderedRegsNames) {
+            for(const string& regName : orderedRegsNames) {
                 regsStr << regName << ":" << (regName.length() == 2 ? " " : "") << " " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << setfill('0') << setw(2 * sizeof(BigInt)) << hex << regs[regName] << Logger::getLogger().getLogColorStr(LogLevel::SUCCESS);
                 if(counter < regs.size() - 1) {
                     if(((counter + 1) % 3) == 0) regsStr << endl;
@@ -1276,12 +1276,12 @@ bool HadesDbg::listenInput(pid_t sonPid) {
     return true;
 }
 
-void HadesDbg::reportError(string error) {
+void HadesDbg::reportError(const string& error) const {
     Logger::getLogger().log(LogLevel::ERROR, error);
     if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Error" << endl;
 }
 
-void HadesDbg::reportFatalError(string error) {
+void HadesDbg::reportFatalError(const string& error) const {
     Logger::getLogger().log(LogLevel::FATAL, error);
     if(this->params.outputFile && this->params.outputFile->is_open()) *this->params.outputFile << "Fatal error" << endl;
 }
@@ -1450,9 +1450,9 @@ void HadesDbg::run() {
             pwrite(this->memoryFd, breakpointCall, breakpointCallSize, (long)breakpointAddr);
             unsigned char nopsAmount = breakpointSize - breakpointCallSize;
             char* nopsArr = (char*) malloc(nopsAmount);
-            for(int i = 0; i < nopsAmount; i++) nopsArr[i] = 0x90;
+            for(int i = 0; i < nopsAmount; i++) nopsArr[i] = (char)0x90;
             if(nopsArr) {
-                pwrite(this->memoryFd, nopsArr, nopsAmount, (long)breakpointAddr + breakpointCallSize);
+                pwrite(this->memoryFd, nopsArr, nopsAmount, breakpointAddr + breakpointCallSize); // NOLINT(cppcoreguidelines-narrowing-conversions)
                 delete nopsArr;
             } else {
                 this->reportFatalError("Failure...");
@@ -1492,7 +1492,7 @@ void HadesDbg::run() {
                         Logger::getLogger().log(LogLevel::INFO, breakpointHit.str());
                         if(this->scriptByBreakpoint.count(bpIndex)) {
                             vector<string> commands = this->scriptByBreakpoint[bpIndex];
-                            for(string command : commands) {
+                            for(const string& command : commands) {
                                 stringstream commandMsg;
                                 commandMsg << "Script >> " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << command << Logger::getLogger().getLogColorStr(LogLevel::INFO);
                                 Logger::getLogger().log(LogLevel::INFO, commandMsg.str());
@@ -1505,7 +1505,7 @@ void HadesDbg::run() {
                                 stringstream runAskStr;
                                 runAskStr << "Asking " + Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << hex << +sonPid << Logger::getLogger().getLogColorStr(LogLevel::INFO) + " to resume execution...";
                                 Logger::getLogger().log(LogLevel::INFO, runAskStr.str());
-                                if(this->endBp(sonPid)) Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
+                                if(this->endBp((pid_t)sonPid)) Logger::getLogger().log(LogLevel::SUCCESS, "Success !");
                                 else this->reportError("An error occured !");
                             }
                         }
@@ -1523,3 +1523,4 @@ void HadesDbg::run() {
     } else this->reportFatalError("Unable to access memory of running target. Missing rights ?");
     this->handleExit();
 }
+#pragma clang diagnostic pop

@@ -14,14 +14,14 @@ Config defaultConfig = {
 ConfigFileManager* ConfigFileManager::instance = nullptr;
 
 ConfigFileManager::ConfigFileManager() {
-    if(!this->configExists()) {
+    if(!configExists()) {
         this->config = &defaultConfig;
     } else this->config = readConfig();
     this->writeConfig(*this->config);
 }
 
 Config* ConfigFileManager::readConfig() {
-    Config* conf = (Config*) malloc(sizeof(Config));
+    auto* conf = (Config*) malloc(sizeof(Config));
     if(conf) {
         ifstream configFile(configPath + configName);
         if(configFile.is_open()) {
@@ -44,7 +44,7 @@ Config* ConfigFileManager::readConfig() {
     return &defaultConfig;
 }
 
-Theme ConfigFileManager::stringToTheme(std::string themeStr) {
+Theme ConfigFileManager::stringToTheme(const std::string& themeStr) {
     Theme theme = defaultConfig.theme;
     if(toUppercase(themeStr) == "CETUS") {
         theme = Theme::CETUS;
@@ -56,6 +56,8 @@ Theme ConfigFileManager::stringToTheme(std::string themeStr) {
     return theme;
 }
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "misc-no-recursion"
 string ConfigFileManager::themeToString(Theme theme) {
     string themeStr;
     switch(theme) {
@@ -73,11 +75,12 @@ string ConfigFileManager::themeToString(Theme theme) {
     }
     return themeStr;
 }
+#pragma clang diagnostic pop
 
-void ConfigFileManager::writeConfig(Config config) {
+void ConfigFileManager::writeConfig(Config conf) {
     json::jobject configJson;
-    configJson["open_delay_milli"] = config.openDelayMilli;
-    configJson["theme"] = this->themeToString(config.theme);
+    configJson["open_delay_milli"] = conf.openDelayMilli;
+    configJson["theme"] = this->themeToString(conf.theme);
     string jsonStr = configJson.pretty();
     if(!filesystem::exists(configPath)) filesystem::create_directories(configPath);
     ofstream configFile(configPath + configName);

@@ -35,6 +35,8 @@ bool endsWith(std::string const &value, std::string const &ending) {
     return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
 }
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "LocalValueEscapesScope"
 string executeCommand(const char* cmd) {
     array<char, 128> buffer = {};
     string result;
@@ -47,6 +49,7 @@ string executeCommand(const char* cmd) {
     }
     return result;
 }
+#pragma clang diagnostic pop
 
 BigInt invertEndian(BigInt val) {
     unsigned long long int ret = 0;
@@ -59,7 +62,7 @@ BigInt invertEndian(BigInt val) {
 }
 
 string removeConsoleChars(string consoleOut) {
-    string ret = "";
+    string ret;
     for(int i = 0; i < consoleOut.length(); i++) {
         char currentChar = consoleOut[i];
         if(currentChar == '\033') {
@@ -78,9 +81,9 @@ string findHomeDir() {
 }
 
 string trim(string str) {
-    int index;
+    unsigned int index;
     string output;
-    while((index = str.find_first_of(" ")) != string::npos) {
+    while((index = str.find_first_of(' ')) != string::npos) {
         output += str.substr(0,index);
         str = str.substr(index+1);
     }

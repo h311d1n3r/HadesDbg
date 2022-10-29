@@ -19,28 +19,27 @@ enum LogLevel {
 };
 
 enum LogColor {
-    BLACK = 30,
-    RED = 31,
-    GREEN = 32,
-    YELLOW = 33,
-    BLUE = 34,
-    MAGENTA = 35,
-    CYAN = 36,
-    WHITE = 37,
-    BRIGHT_BLACK = 90,
-    BRIGHT_RED = 91,
-    BRIGHT_GREEN = 92,
-    BRIGHT_YELLOW = 93,
-    BRIGHT_BLUE = 94,
-    BRIGHT_MAGENTA = 95,
-    BRIGHT_CYAN = 96,
-    BRIGHT_WHITE = 97
+    BLACK [[maybe_unused]] = 30,
+    RED [[maybe_unused]] = 31,
+    GREEN [[maybe_unused]] = 32,
+    YELLOW [[maybe_unused]] = 33,
+    BLUE [[maybe_unused]] = 34,
+    MAGENTA [[maybe_unused]] = 35,
+    CYAN [[maybe_unused]] = 36,
+    WHITE [[maybe_unused]] = 37,
+    BRIGHT_BLACK [[maybe_unused]] = 90,
+    BRIGHT_RED [[maybe_unused]] = 91,
+    BRIGHT_GREEN [[maybe_unused]] = 92,
+    BRIGHT_YELLOW [[maybe_unused]] = 93,
+    BRIGHT_BLUE [[maybe_unused]] = 94,
+    BRIGHT_MAGENTA [[maybe_unused]] = 95,
+    BRIGHT_CYAN [[maybe_unused]] = 96,
+    BRIGHT_WHITE [[maybe_unused]] = 97
 };
 
 class Logger {
 private:
     static Logger* instance;
-    ofstream* outputFile;
     map<LogLevel, LogColor> colorsByLevels;
     void initTheme(Theme theme);
 public:

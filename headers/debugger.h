@@ -30,11 +30,11 @@ private:
     static string prepareAction(pid_t pid, char* bytes, unsigned int bytesLen);
     map<string, BigInt> readRegs(pid_t sonPid);
     bool endBp(pid_t sonPid);
-    void execCommand(pid_t sonPid, string input);
+    void execCommand(pid_t sonPid, const string& input);
     bool listenInput(pid_t sonPid);
     bool readScriptFile();
-    void reportError(string error);
-    void reportFatalError(string error);
+    void reportError(const string& error) const;
+    void reportFatalError(const string& error) const;
 public:
     enum DbgCode {
         TARGET_READY = 0x1,
@@ -45,7 +45,7 @@ public:
         WRITE_MEM = 0x6,
         READ_REGS = 0x7,
     };
-    explicit HadesDbg(BinaryParams params) : params(move(params)){
+    explicit HadesDbg(BinaryParams params) : params(std::move(params)){
         this->fileEntry = 0;
         this->effectiveEntry = 0;
         this->replacedFileEntry = nullptr;

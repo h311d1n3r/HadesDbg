@@ -65,6 +65,8 @@ void Logger::log(LogLevel level, const string& message, bool bold, bool prefixSy
         case LogLevel::FATAL:
             prefix << (prefixSymbol ? "[!] " : "");
             break;
+        case VARIABLE:
+            break;
     }
     prefix << message << "\033[0m";
     cout << prefix.str() << endl;

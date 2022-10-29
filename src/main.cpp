@@ -55,7 +55,7 @@ void printHelpMessage() {
     Logger::getLogger().log(LogLevel::INFO, flagsList.str(), false, false);
 }
 
-bool addBreakpoint(string val) {
+bool addBreakpoint(const string& val) {
     int delimiterIndex = (int)val.find(':');
     if(delimiterIndex == string::npos) {
         stringstream msg;
