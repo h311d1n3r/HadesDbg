@@ -4,6 +4,7 @@ HADESDBG_64_NAME=hadesdbg64
 HADESDBG_SRC=src
 HADESDBG_INC=headers
 HADESDBG_OUT=bin
+HADESDBG_RELEASE_OUT=release
 HADESDBG_OUT_LIB=bin/lib
 HADESDBG_OUT=./bin
 HADESDBG_TEST_SRC_32=./test/src/x86
@@ -28,6 +29,7 @@ LIB_64_DIR=x64
 
 CC=g++
 COMPILE_FLAGS=-std=c++17 -lrt
+RELEASE_FLAGS=-static-libstdc++
 COMPILE_32_FLAGS=-m32
 COMPILE_64_FLAGS=-m64
 QUIET_MODE=> /dev/null
@@ -68,6 +70,7 @@ bin/lib:
 	@rm -rf $(SIMPLESON_OUT)
 	@echo "Libraries successfully compiled !"
 
+.PHONY: compile
 compile: bin/lib
 	@echo "Compiling project..."
 	@mkdir -p $(HADESDBG_OUT)
@@ -79,6 +82,20 @@ compile: bin/lib
 	@chmod 777 $(HADESDBG_OUT)/$(HADESDBG_64_NAME)
 	@echo "Project successfully compiled !"
 
+.PHONY: release
+release: bin/lib
+	@echo "Releasing project..."
+	@mkdir -p $(HADESDBG_RELEASE_OUT)
+	@echo "Releasing 32bit version..."
+	@$(CC) $(RELEASE_FLAGS) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(ASMJIT_INC) -I$(SIMPLESON_INC) -o$(HADESDBG_RELEASE_OUT)/$(HADESDBG_32_NAME) $(COMPILE_FLAGS) $(COMPILE_32_FLAGS) -L"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_32_DIR)" -l$(ASMJIT_NAME) -l$(SIMPLESON_NAME) -Wl,-rpath,"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_32_DIR)"
+	@chmod 777 $(HADESDBG_RELEASE_OUT)/$(HADESDBG_32_NAME)
+	@echo "Releasing 64bit version..."
+	@$(CC) $(RELEASE_FLAGS) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(ASMJIT_INC) -I$(SIMPLESON_INC) -o$(HADESDBG_RELEASE_OUT)/$(HADESDBG_64_NAME) $(COMPILE_FLAGS) $(COMPILE_64_FLAGS) -L"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_64_DIR)" -l$(ASMJIT_NAME) -l$(SIMPLESON_NAME) -Wl,-rpath,"`pwd`/$(HADESDBG_OUT_LIB)/$(LIB_64_DIR)"
+	@chmod 777 $(HADESDBG_RELEASE_OUT)/$(HADESDBG_64_NAME)
+	@cd $(HADESDBG_RELEASE_OUT) && zip ../HadesDbg.zip $(HADESDBG_32_NAME) $(HADESDBG_64_NAME)
+	@rm -rf $(HADESDBG_RELEASE_OUT)
+	@echo "Project successfully released !"
+	
 .PHONY: test
 test:
 	@mkdir -p $(HADESDBG_TEST_OUT_32)
@@ -92,7 +109,8 @@ test:
 		$(CC) $(COMPILE_FLAGS) $(COMPILE_64_FLAGS) $$test_src_file -o$(HADESDBG_TEST_OUT_64)/`echo $$test_src_file | rev | cut -d'/' -f 1 | rev | cut -d'.' -f 1)` ; \
 	done
 	@echo "Done !"
-			  
+
+.PHONY:	clean
 clean:
 	@echo "Cleaning output directory..."
 	@rm -f $(HADESDBG_OUT)/$(HADESDBG_32_NAME)

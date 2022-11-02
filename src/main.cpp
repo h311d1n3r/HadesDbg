@@ -15,7 +15,7 @@ const string TOOL_TITLE = "  _  _         _        ___  _          \n"
                           " | __ / _` / _` / -_|_-< |) | '_ \\/ _` |\n"
                           " |_||_\\__,_\\__,_\\___/__/___/|_.__/\\__, |\n"
                           "                                  |___/ ";
-const string VERSION = "1.0";
+const string VERSION = "1.1";
 const string AUTHOR = "h311d1n3r";
 #if __x86_64__
 const string ARCHITECTURE = "64bit";
