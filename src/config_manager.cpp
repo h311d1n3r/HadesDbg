@@ -2,6 +2,7 @@
 #include <json.h>
 #include <filesystem>
 #include <log.h>
+#include <iostream>
 
 string configPath = findHomeDir()+"/.hadesdbg/";
 string configName = "config.json";
@@ -77,20 +78,21 @@ string ConfigFileManager::themeToString(Theme theme) {
 }
 #pragma clang diagnostic pop
 
+//Not using logger to prevent recursive errors
 void ConfigFileManager::writeConfig(Config conf) {
     json::jobject configJson;
     configJson["open_delay_milli"] = conf.openDelayMilli;
     configJson["theme"] = this->themeToString(conf.theme);
     string jsonStr = configJson.pretty();
-    if(!filesystem::exists(configPath)) filesystem::create_directories(configPath);
-    ofstream configFile(configPath + configName);
-    if(configFile.is_open()) {
-        configFile << jsonStr;
-        configFile.close();
-    } else {
-        stringstream errorStream;
-        errorStream << "Couldn't open config file " << Logger::getLogger().getLogColorStr(LogLevel::VARIABLE) << configPath << configName << Logger::getLogger().getLogColorStr(LogLevel::ERROR) << " ! Missing rights ?" << endl;
-        Logger::getLogger().log(LogLevel::ERROR, errorStream.str());
+    try {
+        if(!filesystem::exists(configPath)) filesystem::create_directories(configPath);
+        ofstream configFile(configPath + configName);
+        if(configFile.is_open()) {
+            configFile << jsonStr;
+            configFile.close();
+        } else cerr << "Couldn't open config file " << configPath << configName << " ! Missing rights ?" << endl;
+    } catch (const exception& e) {
+        cerr << "An error occured while writing configuration file at path : " << configPath << configName << " ! Missing rights ?" << endl;
     }
 }
 

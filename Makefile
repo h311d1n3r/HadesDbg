@@ -93,7 +93,7 @@ release: bin/lib
 	@$(CC) $(RELEASE_FLAGS) $(HADESDBG_SRC)/*.cpp -I$(HADESDBG_INC) -I$(ASMJIT_INC) -I$(SIMPLESON_INC) -o$(HADESDBG_RELEASE_OUT)/$(HADESDBG_64_NAME) $(COMPILE_FLAGS) $(COMPILE_64_FLAGS) -L"$(HADESDBG_OUT_LIB)/$(LIB_64_DIR)" -l$(ASMJIT_NAME) -l$(SIMPLESON_NAME)
 	@chmod 777 $(HADESDBG_RELEASE_OUT)/$(HADESDBG_64_NAME)
 	@echo "Building zip archive..."
-	@cd $(HADESDBG_RELEASE_OUT) && zip ../HadesDbg.zip $(HADESDBG_32_NAME) $(HADESDBG_64_NAME) && cd ../$(HADESDBG_OUT) && zip ../HadesDbg.zip ./lib/**/*
+	@cd $(HADESDBG_RELEASE_OUT) && zip ../HadesDbg.zip $(HADESDBG_32_NAME) $(HADESDBG_64_NAME)
 	@rm -rf $(HADESDBG_RELEASE_OUT)
 	@echo "Project successfully released !"
 	
